@@ -3,7 +3,7 @@
 
 const { exec } = require('child_process');
 
-const totalRuns = 10;
+const totalRuns = 1;
 let currentRun = 0;
 
 console.log(`🚀 Starting batch creator — will run creator.js ${totalRuns} times, then run push.py ONCE.\n`);
@@ -14,7 +14,7 @@ function runCreator() {
     console.log(`🚀 Now running push.py ONCE...\n`);
 
     // Run push.py only once after everything is done
-    const pushProcess = exec('python push.py');
+    const pushProcess = exec('python3 push.py');
 
     pushProcess.stdout.on('data', (data) => process.stdout.write(data));
     pushProcess.stderr.on('data', (data) => process.stderr.write(data));
