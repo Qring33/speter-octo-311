@@ -8,7 +8,7 @@ const scripts = [
   'main.js',
   'main_1.js',
 ];
-const totalRunsPerScript = 10;
+const totalRunsPerScript = 2;
 const timeoutMs = 10 * 60 * 1000; // 10 minutes
 const delayBetweenRuns = 2000; // 2 seconds
 
