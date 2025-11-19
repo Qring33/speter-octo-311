@@ -8,9 +8,10 @@ const scripts = [
   'main.js',
   'main_1.js',
 ];
-const totalRunsPerScript = 2;
+const totalRunsPerScript = 10;
 const timeoutMs = 10 * 60 * 1000; // 10 minutes
-const delayBetweenRuns = 2000; // 2 seconds
+const delayBetweenRuns = 2000;   // 2 seconds between individual runs
+const delayBetweenScripts = 3000; // pause before switching to next script
 
 let currentScriptIndex = 0;
 let currentRun = 0;
@@ -18,22 +19,36 @@ let currentRun = 0;
 console.log(`🚀 Starting batch sequence — each script will run ${totalRunsPerScript} times.\n`);
 
 function runScript() {
-  const script = scripts[currentScriptIndex];
+  // All scripts and all runs are done → execute push.py ONCE and exit
+  if (currentScriptIndex >= scripts.length) {
+    console.log(`\n🎉 All Node.js scripts completed! Running push.py once...`);
+    exec('python3 push.py', (err, stdout, stderr) => {
+      if (err) {
+        console.error(`❌ push.py failed: ${err.message}`);
+        process.exit(1);
+      }
+      if (stderr) process.stderr.write(stderr);
+      if (stdout) process.stdout.write(stdout);
 
-  if (!script) {
-    console.log(`✅ All scripts completed successfully. Exiting.`);
-    process.exit(0);
+      console.log(`✅ push.py executed successfully. Entire batch finished.`);
+      process.exit(0);
+    });
+    return;
   }
 
+  const script = scripts[currentScriptIndex];
+
+  // Finished all runs for current script → move to next script
   if (currentRun >= totalRunsPerScript) {
-    console.log(`🏁 Finished all ${totalRunsPerScript} runs for ${script}. Moving to next script...\n`);
+    console.log(`🏁 Finished all \( {totalRunsPerScript} runs for \){script}. Moving to next script...\n`);
     currentRun = 0;
     currentScriptIndex++;
-    return setTimeout(runScript, 3000); // short pause before next script
+    setTimeout(runScript, delayBetweenScripts);
+    return;
   }
 
   currentRun++;
-  console.log(`\n⚙️  [${script}] Run ${currentRun} of ${totalRunsPerScript} starting...`);
+  console.log(`\n⚙️  [\( {script}] Run \){currentRun}/${totalRunsPerScript} starting...`);
 
   const startTime = Date.now();
   const processInstance = exec(`node ${script}`, { timeout: timeoutMs });
@@ -43,21 +58,19 @@ function runScript() {
 
   processInstance.on('close', (code) => {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-
     if (code === 0) {
-      console.log(`✅ [${script}] Run ${currentRun} completed successfully in ${duration}s.`);
+      console.log(`✅ [\( {script}] Run \){currentRun} succeeded (${duration}s)`);
     } else {
-      console.warn(`⚠️ [${script}] Run ${currentRun} failed (exit code ${code}). Continuing...`);
+      console.warn(`⚠️ [\( {script}] Run \){currentRun} failed (code ${code}) – continuing anyway`);
     }
-
     setTimeout(runScript, delayBetweenRuns);
   });
 
   processInstance.on('error', (err) => {
-    console.error(`❌ [${script}] Unexpected error on run ${currentRun}: ${err.message}`);
+    console.error(`❌ [\( {script}] Spawn error on run \){currentRun}: ${err.message}`);
     setTimeout(runScript, delayBetweenRuns);
   });
 }
 
-// Start execution chain
+// Start the chain
 runScript();

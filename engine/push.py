@@ -1,67 +1,75 @@
 import base64
 import json
 import requests
-import os  # ← Added this import (this was the only thing missing)
+import os
 
-# === FETCH TOKEN FROM DROPBOX (automatically at runtime) ===
-DROPBOX_RAW_URL = "https://www.dropbox.com/scl/fi/e3k4f55zpny41ptw2pbrz/git_token.txt?rlkey=nfsxxwlkponq4qoqimrbu9xns&st=npwv1f1o&dl=1"
+# === AUTOMATICALLY FETCH TOKEN FROM DROPBOX ===
+DROPBOX_LINK = "https://www.dropbox.com/scl/fi/e3k4f55zpny41ptw2pbrz/git_token.txt?rlkey=nfsxxwlkponq4qoqimrbu9xns&st=npwv1f1o&dl=0"
 
-print("[INFO] Fetching GitHub token from Dropbox...")
+# Force raw download by changing dl=0 → dl=1
+raw_url = DROPBOX_LINK.replace("dl=0", "dl=1") if "dl=0" in DROPBOX_LINK else DROPBOX_LINK + "?dl=1"
+
 try:
-    response = requests.get(DROPBOX_RAW_URL, timeout=10)
-    response.raise_for_status()
-    TOKEN = response.text.strip()
-
-    if not TOKEN.startswith("ghp_") and not TOKEN.startswith("github_pat_"):
-        raise ValueError("Downloaded content doesn't look like a valid GitHub token")
+    TOKEN = requests.get(raw_url, timeout=10).text.strip()
+    if not TOKEN.startswith("ghp_"):
+        raise ValueError("Token does not look like a valid GitHub token")
 except Exception as e:
-    raise SystemExit(f"[FATAL] Failed to load token from Dropbox → {e}")
+    raise SystemExit(f"[FATAL] Could not fetch token from Dropbox → {e}")
 
-print("[SUCCESS] Token loaded successfully!\n")
-
-# === Your configuration ===
+# === Rest of your configuration (unchanged) ===
 USERNAME = "Qring33"
 REPO = "speter-octo-311"
 BRANCH = "main"
-FILEPATH_LOCAL = "tempmail.json"                    # Local file to upload
-FILEPATH_REPO = "engine/tempmail.json"              # Path inside the GitHub repo
 
-# === Read and encode the local file ===
-if not os.path.isfile(FILEPATH_LOCAL):  # ← Fixed: was requests.path.isfile
-    raise SystemExit(f"[ERROR] Local file not found: {FILEPATH_LOCAL}")
-
-with open(FILEPATH_LOCAL, "rb") as f:
-    encoded_content = base64.b64encode(f.read()).decode("utf-8")
-
-# === GitHub API URL ===
-url = f"https://api.github.com/repos/{USERNAME}/{REPO}/contents/{FILEPATH_REPO}"
-
-# === Check if file already exists (to get SHA for updates) ===
-headers = {"Authorization": f"token {TOKEN}"}
-response = requests.get(url, headers=headers)
-
-sha = response.json().get("sha") if response.status_code == 200 else None
-
-# === Prepare payload ===
-payload = {
-    "message": f"Auto-update tempmail.json – {requests.utils.default_user_agent()}",
-    "content": encoded_content,
-    "branch": BRANCH
+FILES_TO_UPLOAD = {
+    "tempmail.json": "engine/tempmail.json",
+    "tempmail_1.json": "engine/tempmail_1.json",
 }
-if sha:
-    payload["sha"] = sha  # Required when updating existing file
 
-# === Upload / Update the file ===
-put_response = requests.put(
-    url,
-    headers=headers,
-    data=json.dumps(payload)
-)
+API_URL = f"https://api.github.com/repos/{USERNAME}/{REPO}/contents"
 
-# === Result ===
-if put_response.status_code in (200, 201):
-    print("[SUCCESS] tempmail.json successfully uploaded/updated in the repo!")
-else:
-    print("[FAILED] Upload failed!")
-    print("Status:", put_response.status_code)
-    print("Response:", put_response.text)
+
+def upload_file(local_path, repo_path):
+    # Read and Base64-encode file
+    with open(local_path, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("utf-8")
+
+    # Build URL
+    url = f"{API_URL}/{repo_path}"
+
+    # Check if file already exists to get SHA
+    check = requests.get(url, headers={"Authorization": f"token {TOKEN}"})
+    sha = check.json().get("sha") if check.status_code == 200 else None
+
+    # Build payload
+    payload = {
+        "message": f"Auto-update {os.path.basename(local_path)}",
+        "content": encoded,
+        "branch": BRANCH
+    }
+    if sha:
+        payload["sha"] = sha
+
+    # Upload
+    put = requests.put(
+        url,
+        headers={
+            "Authorization": f"token {TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        },
+        data=json.dumps(payload)
+    )
+
+    if put.status_code in (200, 201):
+        print(f"[SUCCESS] {local_path} → {repo_path}")
+    else:
+        print(f"[FAILED] {local_path}: {put.status_code} — {put.text}")
+
+
+# === Execute uploads ===
+print("[INFO] Token successfully loaded from Dropbox\n")
+for local, repo in FILES_TO_UPLOAD.items():
+    if not os.path.exists(local):
+        print(f"[SKIPPED] Missing local file: {local}")
+        continue
+    upload_file(local, repo)
