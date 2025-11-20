@@ -1,72 +1,87 @@
-// runner.js
-// Usage: node runner.js
+// batch_main.js
+// Usage: node batch_main.js
 
 const { exec } = require('child_process');
 
-// Configuration
-const scripts = [
-  'main.js',
-  'main_1.js',
-];
+const scripts = ['main.js', 'main_1.js'];
 const totalRunsPerScript = 10;
 const timeoutMs = 10 * 60 * 1000; // 10 minutes
 const delayBetweenRuns = 2000;    // 2 seconds
-const delayBetweenScripts = 3000; // 3 seconds
 
 let currentScriptIndex = 0;
 let currentRun = 0;
+let nodeScriptsDone = false;
 
-console.log(`Starting batch sequence — each script will run ${totalRunsPerScript} times.\n`);
+console.log("🚀 Starting batch sequence 🚀 each script will run " + totalRunsPerScript + " times.\n");
 
 function runScript() {
-  if (currentScriptIndex >= scripts.length) {
-    console.log(`\nAll Node.js scripts completed! Running push.py once...`);
-    exec('python3 push.py', (err, stdout, stderr) => {
-      if (err) {
-        console.error(`push.py failed: ${err.message}`);
-        process.exit(1);
-      }
-      if (stderr) process.stderr.write(stderr);
-      if (stdout) process.stdout.write(stdout);
-      console.log(`push.py executed successfully. Entire batch finished.`);
-      process.exit(0);
-    });
+  if (nodeScriptsDone) {
+    runPushOnce();
     return;
   }
 
   const script = scripts[currentScriptIndex];
 
+  if (!script) {
+    console.log("✅ All Node.js scripts completed (" + scripts.length + " × " + totalRunsPerScript + " runs)\n");
+    nodeScriptsDone = true;
+    setTimeout(runScript, 3000);
+    return;
+  }
+
   if (currentRun >= totalRunsPerScript) {
-    console.log(`Finished all \( {totalRunsPerScript} runs for \){script}. Moving to next script...\n`);
+    console.log("✔ Finished all " + totalRunsPerScript + " runs for " + script + ". Moving to next script...\n");
     currentRun = 0;
     currentScriptIndex++;
-    setTimeout(runScript, delayBetweenScripts);
+    setTimeout(runScript, 3000);
     return;
   }
 
   currentRun++;
-  console.log(`\n [\( {script}] Run \){currentRun}/${totalRunsPerScript} starting...`);
+  console.log("\n🔥 [" + script + "] Run " + currentRun + " of " + totalRunsPerScript + " starting...");
 
   const startTime = Date.now();
-  const child = exec(`node ${script}`, { timeout: timeoutMs });
+  const child = exec("node " + script, { timeout: timeoutMs });
 
   child.stdout.on('data', data => process.stdout.write(data));
   child.stderr.on('data', data => process.stderr.write(data));
 
-  child.on('close', (code) => {
+  child.on('close', code => {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     if (code === 0) {
-      console.log(` [\( {script}] Run \){currentRun} succeeded (${duration}s)`);
+      console.log("✅ [" + script + "] Run " + currentRun + " completed successfully in " + duration + "s.");
     } else {
-      console.warn(` [\( {script}] Run \){currentRun} failed (code ${code}) – continuing`);
+      console.log("❌ [" + script + "] Run " + currentRun + " failed (exit code " + code + "). Continuing anyway...");
     }
     setTimeout(runScript, delayBetweenRuns);
   });
 
-  child.on('error', (err) => {
-    console.error(` [\( {script}] Spawn error on run \){currentRun}: ${err.message}`);
+  child.on('error', err => {
+    console.error("⚠️ [" + script + "] Process error on run " + currentRun + ": " + err.message);
     setTimeout(runScript, delayBetweenRuns);
   });
 }
 
+function runPushOnce() {
+  console.log("🐍 Running final step: python3 push.py (only once)\n");
+  const p = exec('python3 push.py');
+  p.stdout.on('data', d => process.stdout.write(d));
+  p.stderr.on('data', d => process.stderr.write(d));
+  p.on('close', code => {
+    if (code === 0) {
+      console.log("🎉 python3 push.py finished successfully!");
+    } else {
+      console.log("❌ python3 push.py exited with code " + code);
+    }
+    console.log("\n🏁 Entire batch process completed! Goodbye! 🏁\n");
+    process.exit(code);
+  });
+
+  p.on('error', err => {
+    console.error("💥 Failed to start python3 push.py: " + err.message);
+    process.exit(1);
+  });
+}
+
+// Start
 runScript();
