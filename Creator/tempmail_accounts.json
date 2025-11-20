@@ -2544,5 +2544,10 @@
   "10e724fd@comfythings.com": {
     "address": "10e724fd@comfythings.com",
     "password": "b7450bea-ee36-4cc0-94ce-3507273f958b"
+  },
+  "2ffd14e9@comfythings.com": {
+    "address": "2ffd14e9@comfythings.com",
+    "password": "2f38c055-cb14-437a-8346-0c02e36aa5c7",
+    "register": "yes"
   }
 }
