@@ -2636,5 +2636,10 @@
   "cfb5f726@comfythings.com": {
     "address": "cfb5f726@comfythings.com",
     "password": "2ac51026-7ee3-485a-b949-907a7f50d77f"
+  },
+  "29a014c9@comfythings.com": {
+    "address": "29a014c9@comfythings.com",
+    "password": "2e75ee7b-736c-4331-b95d-b7919bc61d53",
+    "register": "yes"
   }
 }
