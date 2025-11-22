@@ -2763,5 +2763,18 @@
     "address": "1d6678d1@comfythings.com",
     "password": "5d5444ee-304a-4896-81c4-cfe53eee2cf9",
     "register": "yes"
+  },
+  "bf27657a@comfythings.com": {
+    "address": "bf27657a@comfythings.com",
+    "password": "b017da73-4db9-47b0-b61e-a2f95cbd5ba7"
+  },
+  "a1351b67@comfythings.com": {
+    "address": "a1351b67@comfythings.com",
+    "password": "14c14287-fd7a-40f7-9fa0-7cd7a09dc24c",
+    "register": "yes"
+  },
+  "fa8294a0@comfythings.com": {
+    "address": "fa8294a0@comfythings.com",
+    "password": "a9478848-a05b-4f67-9e05-95df995df468"
   }
 }
