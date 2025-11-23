@@ -3121,5 +3121,19 @@
     "address": "9a3d28a4@comfythings.com",
     "password": "61cf41ea-f4dc-40a6-bd0c-304ec193b5cf",
     "register": "yes"
+  },
+  "172220a7@comfythings.com": {
+    "address": "172220a7@comfythings.com",
+    "password": "1ab06191-4cda-46db-99e8-7278db02ccf5",
+    "register": "yes"
+  },
+  "05b914f7@comfythings.com": {
+    "address": "05b914f7@comfythings.com",
+    "password": "050d76ea-40c0-4e10-b691-a45b41164ab5"
+  },
+  "0d2d4bbc@comfythings.com": {
+    "address": "0d2d4bbc@comfythings.com",
+    "password": "80316ffa-c046-4579-a9f8-1ac8567273c0",
+    "register": "yes"
   }
 }
