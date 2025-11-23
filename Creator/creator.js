@@ -42,7 +42,7 @@ const { execSync } = require('child_process');
     const page = await context.newPage();
 
     // --- Step 1: Open signup page ---
-    const signupUrl = 'https://audius.co/signup/create-email';
+    const signupUrl = 'https://audius.co/signup?rf=obi350965';
     console.log(`Navigating to ${signupUrl}...`);
     await page.goto(signupUrl, { waitUntil: 'load', timeout: 60000 });
 
