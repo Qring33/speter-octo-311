@@ -3091,5 +3091,20 @@
     "address": "d26b134b@comfythings.com",
     "password": "6e7c2d98-7d13-4fb1-b0cc-0616b8a3fe41",
     "register": "yes"
+  },
+  "bfe771a5@comfythings.com": {
+    "address": "bfe771a5@comfythings.com",
+    "password": "bdf0a4ed-e598-4d81-9ee2-522fb1e30434",
+    "register": "yes"
+  },
+  "d8b61b47@comfythings.com": {
+    "address": "d8b61b47@comfythings.com",
+    "password": "a51525a9-3312-49bc-a924-ee83e86dc6aa",
+    "register": "yes"
+  },
+  "c6030cb7@comfythings.com": {
+    "address": "c6030cb7@comfythings.com",
+    "password": "3e27e402-3152-4b42-98d0-a778ad79e78d",
+    "register": "yes"
   }
 }
