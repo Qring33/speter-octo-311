@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ================== CONFIG ==================
 FOLDER_PATH = "hive_accounts_1"  # folder containing .txt files with keys
-TARGET_AUTHOR = "arlynn"  # author whose latest post will be voted/commented
+TARGET_AUTHOR = "qring"  # author whose latest post will be voted/commented
 
 # --- Read Gemini API key from file ---
 with open("gemini_api.txt", "r") as f:
