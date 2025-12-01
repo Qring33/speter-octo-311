@@ -10,7 +10,11 @@ from beem.account import Account
 # ---------------- Config ----------------
 FOLDER_PATH = "hive_accounts_3"
 NODES = ["https://api.openhive.network"]
-CONCURRENT_THREADS = 3
+CONCURRENT_THREADS = 6
+
+# ---------------- Read Gemini API Key ----------------
+with open("gemini_api.txt", "r") as f:
+    GEMINI_API_KEY = f.read().strip()
 
 # ---------------- Helper Function ----------------
 def extract_posting_key(file_path):

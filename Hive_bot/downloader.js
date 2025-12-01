@@ -5,9 +5,11 @@ const { exec } = require('child_process');
 
 const zipUrl = "https://www.dropbox.com/scl/fo/fmfmi8ponzrdbnui7n5df/AGFalLfx-cTjkRBtEjvr0Hc?rlkey=039hpjf7ipizdza7edqv082tr&st=fpwjatp6&dl=1";
 const jsonUrl = "https://www.dropbox.com/scl/fi/2ei8dwa694bnuu67uhns8/key.json?rlkey=k34mho22158reckeemcg08csr&st=9mgwg3c2&dl=1";
+const geminiUrl = "https://www.dropbox.com/scl/fi/449b6sq1xn1juvoir8w1o/gemini_api.txt?rlkey=77le07b7tq2wa79x9mbxtux2z&st=0561tmzp&dl=1";
 
 const zipFile = "hive_accounts.zip";
 const jsonFile = "key.json";
+const geminiFile = "gemini_api.txt";
 
 const folder1 = "hive_accounts";
 const copies = [
@@ -19,22 +21,16 @@ const copies = [
 function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {
         https.get(url, (res) => {
-
-            // Handle HTTP redirect
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
                 return resolve(downloadFile(res.headers.location, dest));
             }
-
             if (res.statusCode !== 200) {
-                return reject(`Download failed: ${res.statusCode}`);
+                return reject(`Download failed with status code: ${res.statusCode}`);
             }
-
             const file = fs.createWriteStream(dest);
             res.pipe(file);
-
             file.on("finish", () => file.close(() => resolve(dest)));
             file.on("error", reject);
-
         }).on("error", reject);
     });
 }
@@ -48,33 +44,36 @@ function copyFolders() {
 
 (async () => {
     try {
-        console.log("⏬ Downloading ZIP...");
+        console.log("Downloading ZIP file...");
         await downloadFile(zipUrl, zipFile);
-        console.log("✔ ZIP downloaded");
+        console.log("ZIP downloaded");
 
-        console.log("📦 Extracting ZIP...");
+        console.log("Extracting ZIP...");
         const zip = new AdmZip(zipFile);
         zip.extractAllTo(folder1, true);
-        console.log("✔ Extracted to", folder1);
+        console.log("Extraction complete");
 
-        console.log("📁 Creating copies...");
+        console.log("Creating folder copies...");
         await copyFolders();
-        console.log("✔ Copies created:", copies.join(", "));
+        console.log("Copies created:", copies.join(", "));
 
-        console.log("🗑 Deleting ZIP...");
         fs.unlinkSync(zipFile);
-        console.log("✔ ZIP deleted");
+        console.log("ZIP file deleted");
 
-        console.log("🔑 Downloading key.json...");
+        console.log("Downloading key.json...");
         await downloadFile(jsonUrl, jsonFile);
-        console.log("✔ key.json downloaded");
+        console.log("key.json downloaded");
 
-        console.log("🎉 ALL DONE");
+        console.log("Downloading gemini_api.txt...");
+        await downloadFile(geminiUrl, geminiFile);
+        console.log("gemini_api.txt downloaded");
+
+        console.log("All tasks completed successfully");
 
         process.exit(0);
 
     } catch (err) {
-        console.error("❗ ERROR:", err);
+        console.error("Error:", err);
         process.exit(1);
     }
 })();

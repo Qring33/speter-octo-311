@@ -8,8 +8,11 @@ from beem import Hive
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 FOLDER_PATH = "hive_accounts"
-GEMINI_API_KEY = "AIzaSyCdWw7A7wozpk99OV7ekN9LKsfLbrgjGU8"
 MODEL = "gemini-2.0-flash"
+
+# --- Read Gemini API key from file ---
+with open("gemini_api.txt", "r") as f:
+    GEMINI_API_KEY = f.read().strip()
 
 # --- Your personal Hive account details ---
 PRIMARY_USERNAME = "qring"

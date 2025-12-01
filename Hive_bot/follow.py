@@ -17,6 +17,10 @@ WORKING_NODES = [
     "https://hived.emre.sh",
 ]
 
+# --- Read Gemini API key from file ---
+with open("gemini_api.txt", "r") as f:
+    GEMINI_API_KEY = f.read().strip()
+
 def extract_posting_key(file_path):
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -82,7 +86,7 @@ def follow_user_task(file_name):
 def main():
     print(f"Starting mass-follow → @{TARGET_USER}\n")
     count = 0
-    max_workers = 3  # concurrent threads
+    max_workers = 6  # concurrent threads
 
     while True:
         files = [f for f in os.listdir(FOLDER_PATH) if f.endswith(".txt")]
@@ -99,7 +103,7 @@ def main():
                 print(future.result())
                 count += 1
 
-        time.sleep(1)  # small delay between batches
+        time.sleep(2)  # small delay between batches
 
 if __name__ == "__main__":
     main()

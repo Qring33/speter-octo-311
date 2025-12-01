@@ -13,7 +13,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # ================== CONFIG ==================
 FOLDER_PATH = "hive_accounts_1"  # folder containing .txt files with keys
 TARGET_AUTHOR = "arlynn"  # author whose latest post will be voted/commented
-GEMINI_API_KEY = "AIzaSyCdWw7A7wozpk99OV7ekN9LKsfLbrgjGU8"
+
+# --- Read Gemini API key from file ---
+with open("gemini_api.txt", "r") as f:
+    GEMINI_API_KEY = f.read().strip()
+
 MODEL = "gemini-2.0-flash"
 MIN_COMMENT_LENGTH = 20
 MAX_COMMENT_LENGTH = 100
