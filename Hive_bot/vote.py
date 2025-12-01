@@ -21,7 +21,7 @@ with open("gemini_api.txt", "r") as f:
 MODEL = "gemini-2.0-flash"
 MIN_COMMENT_LENGTH = 20
 MAX_COMMENT_LENGTH = 100
-CONCURRENT_WORKERS = 6
+CONCURRENT_WORKERS = 3
 # ============================================
 
 def extract_posting_key(file_path):
