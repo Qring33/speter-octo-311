@@ -4,8 +4,10 @@ import os
 import re
 import random
 import time
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from beem import Hive
+from beem.instance import set_shared_hive_instance
 
 FOLDER_PATH = "hive_accounts_2"
 TARGET_USER = "qring"
@@ -20,6 +22,9 @@ WORKING_NODES = [
 # --- Read Gemini API key from file ---
 with open("gemini_api.txt", "r") as f:
     GEMINI_API_KEY = f.read().strip()
+
+# --- Suppress low-level beem logs ---
+logging.getLogger("beem").setLevel(logging.CRITICAL)
 
 def extract_posting_key(file_path):
     try:
@@ -49,6 +54,7 @@ def follow_user_task(file_name):
         num_retries_call=3,
         timeout=30
     )
+    set_shared_hive_instance(hive)  # ensure shared instance uses suppressed logging
 
     follow_operation = [
         "follow",
@@ -66,13 +72,13 @@ def follow_user_task(file_name):
             required_posting_auths=[username]
         )
         tx_id = tx.get("id", "N/A") if isinstance(tx, dict) else "N/A"
-        success_msg = f"{username} → now follows @{TARGET_USER} | Tx: {tx_id}"
+        success_msg = f"[pro_update] {username} profile updated | Tx: {tx_id}"
     except Exception as e:
         error_msg = str(e).lower()
         if "already following" in error_msg or "duplicate" in error_msg:
-            success_msg = f"{username} → already following @{TARGET_USER}"
+            success_msg = f"[pro_update] {username} already follows @{TARGET_USER}"
         else:
-            success_msg = f"{username} → FAILED: {e}"
+            success_msg = f"[pro_update] {username} FAILED: {e}"
 
     # remove file if success
     if "FAILED" not in success_msg:

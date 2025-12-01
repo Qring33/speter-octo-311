@@ -2,6 +2,7 @@ import os
 import random
 import subprocess
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from beem import Hive
 from beembase.operations import Account_update2
@@ -15,6 +16,9 @@ CONCURRENT_THREADS = 6
 # ---------------- Read Gemini API Key ----------------
 with open("gemini_api.txt", "r") as f:
     GEMINI_API_KEY = f.read().strip()
+
+# ---------------- Suppress beem internal logs ----------------
+logging.getLogger("beem").setLevel(logging.CRITICAL)
 
 # ---------------- Helper Function ----------------
 def extract_posting_key(file_path):
@@ -31,7 +35,7 @@ def process_account(file_name):
 
     posting_key = extract_posting_key(file_path)
     if not posting_key:
-        print(f"{username} → no valid posting key, deleted")
+        print(f"[pro_update] {username} → no valid posting key, deleted")
         os.remove(file_path)
         return
 
@@ -50,7 +54,7 @@ def process_account(file_name):
 
         # Skip if both profile and cover images exist
         if profile_data.get("profile_image") and profile_data.get("cover_image"):
-            print(f"{username} → profile & cover already exist, skipped")
+            print(f"[pro_update] {username} → profile & cover already exist, skipped")
             os.remove(file_path)
             return
 
@@ -81,11 +85,13 @@ def process_account(file_name):
             }
         )
 
+        # Suppress any internal logs by using try-except around finalizeOp
         tx = hive.finalizeOp(op, username, "posting")
-        print(f"{username} → profile updated | Tx: {tx['trx_id']}")
+        tx_id = tx.get("trx_id", "N/A") if isinstance(tx, dict) else "N/A"
+        print(f"[pro_update] {username} → profile updated | Tx: {tx_id}")
 
     except Exception as e:
-        print(f"{username} → FAILED | {str(e)}")
+        print(f"[pro_update] {username} → FAILED | {str(e)}")
 
     # Delete the file after processing
     os.remove(file_path)
