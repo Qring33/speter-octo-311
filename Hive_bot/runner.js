@@ -2,7 +2,6 @@ const { exec, spawn } = require('child_process');
 
 const scripts = [
     { name: "blog_post", cmd: "python3", args: ["-u", "blog_post.py"] },
-    { name: "vote", cmd: "python3", args: ["-u", "vote.py"] },
     { name: "follow", cmd: "python3", args: ["-u", "follow.py"] },
     { name: "pro_update", cmd: "python3", args: ["-u", "pro_update.py"] },
 ];
