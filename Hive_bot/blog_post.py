@@ -8,15 +8,11 @@ from beem import Hive
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 FOLDER_PATH = "hive_accounts"
-MODEL = "gemini-2.0-flash"
 
-# --- Read Gemini API key from file ---
-with open("gemini_api.txt", "r") as f:
-    GEMINI_API_KEY = f.read().strip()
+PRIMARY_USERNAME = "zuber0"
+PRIMARY_POSTING_KEY = "5JWu6EDJS4HdhnS8v3PCswvHqTktYXizNeQdhizwrmgHAkJf5xV"
 
-# --- Your personal Hive account details ---
-PRIMARY_USERNAME = "qring"
-PRIMARY_POSTING_KEY = "5KS5X9youPJwQZeLJ5g9fP62DNicrG3bFtSr5Hytv4ewHZjQFpD"
+POLLINATIONS_TEXT_URL = "https://text.pollinations.ai/text/"
 
 def extract_keys(file_path):
     with open(file_path, "r") as f:
@@ -33,42 +29,66 @@ def generate_permlink(title):
     permlink += f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
     return permlink
 
-def generate_post_content(prompt="Write a short, simple, engaging Hive blog post,mostly focused on (crypto, finance, business, entrepreneurship) blogs, avoid generating any blog post that will asked me to (Insert) anything in the blog."):
-    """Use Gemini API with proper endpoint and retry until success"""
-    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
-    headers = {"Content-Type": "application/json"}
-    data = {"contents": [{"parts": [{"text": prompt}]}]}
+def generate_post_content(prompt=None):
+    """Generate Hive post content using Pollinations RAW HTTP endpoint."""
+    if prompt is None:
+        prompt = """
+Write a long-form blog post of at least 550 words with a natural human tone. 
+The style must be conversational and readable as if a real person is talking to their community. 
+Avoid emojis, avoid bullet points, avoid advertising language, avoid self-referential statements about being an AI, 
+avoid generic motivational phrases. Do not use the symbols — or • or similar characters. 
+Focus on three themes: current football news, the state of global financial markets, and the Hive blockchain. 
+The football section should discuss current transfer rumors, club performance, and fan communities. 
+The finance section should talk about inflation, crypto market volatility, and how people are reacting to changes in the global economy. 
+The Hive blockchain section should explore what makes Hive different, how the community works, and real examples of people using Hive to create content or earn rewards. 
+The tone should feel like someone writing to their friends on Hive, sharing their perspective and asking for opinions. 
+End with a personal reflection and an open question to readers.
+"""
+        
+    try:
+        url = POLLINATIONS_TEXT_URL + requests.utils.quote(prompt)
+        response = requests.get(url, timeout=25)
 
-    while True:
-        try:
-            response = requests.post(f"{endpoint}?key={GEMINI_API_KEY}", headers=headers, data=json.dumps(data))
-            if response.status_code == 200:
-                result = response.json()
-                text_output = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-                if text_output:
-                    return text_output
-                else:
-                    print("[INFO] Gemini returned empty text, retrying...")
-            else:
-                print(f"[WARN] Gemini failed ({response.status_code}): {response.text}")
-        except Exception as e:
-            print("[ERROR] Gemini API call failed, retrying in 5s:", str(e))
-        time.sleep(5)
+        if response.status_code != 200:
+            print("[ERROR] Pollinations returned HTTP", response.status_code)
+            return None
+
+        text = response.text.strip()
+        if not text:
+            return None
+
+        return text
+
+    except Exception as e:
+        print("[ERROR] Pollinations API request failed:", str(e))
+        return None
 
 def post_test_thread(username, posting_key):
     hive = Hive(keys=[posting_key])
     title = "Daily Hive Update"
     permlink = generate_permlink(title)
-    body = generate_post_content("Write a short, simple, engaging Hive blog post for maximum upvotes")
+    body = generate_post_content()
+
+    if not body:
+        print(f"[WARN] Skipping post for {username}: Pollinations returned empty content.")
+        return False
+
     json_metadata = {
-        "tags": ["LeoFinance", "hive", "daily", "discussion"],
+        "tags": ["hive"],
         "app": "inleo/1.0"
     }
 
     try:
-        hive.post(title=title, body=body, author=username, permlink=permlink, json_metadata=json_metadata)
+        hive.post(
+            title=title,
+            body=body,
+            author=username,
+            permlink=permlink,
+            json_metadata=json_metadata
+        )
         print(f"[SUCCESS] Posted thread as {username} with permlink: {permlink}")
         return True
+
     except Exception as e:
         try:
             op = [
@@ -111,7 +131,6 @@ def process_account_file(file_name):
         print(f"[WARN] Post failed for {username}, file not removed.")
 
 def main():
-    # --- Step 1: Post first with the primary account ONLY ---
     print(f"[INFO] Posting first blog as primary account: {PRIMARY_USERNAME}")
     post_test_thread(PRIMARY_USERNAME, PRIMARY_POSTING_KEY)
     print(f"[INFO] Primary account post complete.")
