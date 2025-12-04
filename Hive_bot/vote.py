@@ -11,7 +11,7 @@ FOLDER_PATH = "hive_accounts_1"  # folder containing .txt files with keys
 TARGET_AUTHOR = "qring"  # author whose latest post will be voted
 CONCURRENT_WORKERS = 2  # reduce concurrency to ~2 accounts/sec
 VOTE_WEIGHT = 20  # 20% vote
-SLEEP_BETWEEN_ACCOUNTS = 0.5  # 0.5 sec between accounts → 2 accounts/sec
+SLEEP_BETWEEN_ACCOUNTS = 0.9  # 0.5 sec between accounts → 2 accounts/sec
 # ============================================
 
 
@@ -119,7 +119,7 @@ def main():
                 future.result()
 
         # Add a small pause before next batch
-        time.sleep(1)
+        time.sleep(2)
 
 
 if __name__ == "__main__":
