@@ -224,7 +224,7 @@ async function microMouse(page) {
   await page.waitForSelector(keysSpanSelector, { timeout: 20000 });
   const jsonKeys = await page.locator(keysSpanSelector).innerText();
 
-  const hiveDir = "./hive_accounts";
+  const hiveDir = "./hive_accounts_2.0";
   if (!fs.existsSync(hiveDir)) fs.mkdirSync(hiveDir);
 
   const hiveFile = path.join(hiveDir, `${username}.txt`);
