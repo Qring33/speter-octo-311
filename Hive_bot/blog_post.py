@@ -1,18 +1,30 @@
 import os
 import re
 import datetime
-import json
 import time
-import requests
+import random
 from beem import Hive
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# --- Import our AI-free generator ---
+from ai import generate_random_post, generate_random_title, datetime
+
 FOLDER_PATH = "hive_accounts"
 
-PRIMARY_USERNAME = "zuber0"
-PRIMARY_POSTING_KEY = "5JWu6EDJS4HdhnS8v3PCswvHqTktYXizNeQdhizwrmgHAkJf5xV"
+# --- Your personal Hive account details ---
+PRIMARY_USERNAME = "qring"
+PRIMARY_POSTING_KEY = "5KS5X9youPJwQZeLJ5g9fP62DNicrG3bFtSr5Hytv4ewHZjQFpD"
 
-POLLINATIONS_TEXT_URL = "https://text.pollinations.ai/text/"
+# --- Reliable Hive nodes ---
+NODES = [
+    "https://api.hive.blog",
+    "https://anyx.io",
+    "https://api.openhive.network",
+    "https://api.pharesim.me",
+    "https://hive.roelandp.nl"
+]
+
+# ======= FUNCTIONS =======
 
 def extract_keys(file_path):
     with open(file_path, "r") as f:
@@ -29,111 +41,91 @@ def generate_permlink(title):
     permlink += f"-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
     return permlink
 
-def generate_post_content(prompt=None):
-    """Generate Hive post content using Pollinations RAW HTTP endpoint."""
-    if prompt is None:
-        prompt = """
-Write a long-form blog post of at least 550 words with a natural human tone. 
-The style must be conversational and readable as if a real person is talking to their community. 
-Avoid emojis, avoid bullet points, avoid advertising language, avoid self-referential statements about being an AI, 
-avoid generic motivational phrases. Do not use the symbols — or • or similar characters. 
-Focus on three themes: current football news, the state of global financial markets, and the Hive blockchain. 
-The football section should discuss current transfer rumors, club performance, and fan communities. 
-The finance section should talk about inflation, crypto market volatility, and how people are reacting to changes in the global economy. 
-The Hive blockchain section should explore what makes Hive different, how the community works, and real examples of people using Hive to create content or earn rewards. 
-The tone should feel like someone writing to their friends on Hive, sharing their perspective and asking for opinions. 
-End with a personal reflection and an open question to readers.
-"""
-        
-    try:
-        url = POLLINATIONS_TEXT_URL + requests.utils.quote(prompt)
-        response = requests.get(url, timeout=25)
-
-        if response.status_code != 200:
-            print("[ERROR] Pollinations returned HTTP", response.status_code)
-            return None
-
-        text = response.text.strip()
-        if not text:
-            return None
-
-        return text
-
-    except Exception as e:
-        print("[ERROR] Pollinations API request failed:", str(e))
-        return None
-
-def post_test_thread(username, posting_key):
-    hive = Hive(keys=[posting_key])
-    title = "Daily Hive Update"
-    permlink = generate_permlink(title)
-    body = generate_post_content()
-
-    if not body:
-        print(f"[WARN] Skipping post for {username}: Pollinations returned empty content.")
-        return False
-
+def safe_post(hive, title, body, permlink, username):
     json_metadata = {
-        "tags": ["hive"],
+        "tags": ["LeoFinance", "hive", "daily", "discussion", "business", "tech", "finance"],
         "app": "inleo/1.0"
     }
-
-    try:
-        hive.post(
-            title=title,
-            body=body,
-            author=username,
-            permlink=permlink,
-            json_metadata=json_metadata
-        )
-        print(f"[SUCCESS] Posted thread as {username} with permlink: {permlink}")
-        return True
-
-    except Exception as e:
+    for attempt in range(5):  # Retry for transient errors
         try:
-            op = [
-                [
-                    "comment",
-                    {
-                        "parent_author": "",
-                        "parent_permlink": "hive-1",
-                        "author": username,
-                        "permlink": permlink,
-                        "title": title,
-                        "body": body,
-                        "json_metadata": json_metadata,
-                    },
-                ]
-            ]
-            tx = hive.rpc.broadcast_transaction_synchronous({"operations": op, "signatures": []})
-            print(f"[FALLBACK] Broadcast attempted for {username}. Response: {tx}")
+            hive.post(title=title, body=body, author=username, permlink=permlink, json_metadata=json_metadata)
+            print(f"[SUCCESS] Posted thread as {username} with permlink: {permlink}")
             return True
-        except Exception as e2:
-            print("[ERROR] Posting failed:", str(e), str(e2))
-            return False
+        except Exception as e:
+            error_msg = str(e)
+
+            # --- Skip account if posting interval not reached ---
+            if "HIVE_MIN_ROOT_COMMENT_INTERVAL" in error_msg:
+                print(f"[SKIP] Account {username} cannot post yet (5 min interval). Skipping.")
+                return False
+
+            # --- Skip account if insufficient RC mana ---
+            if "payer has not enough RC mana" in error_msg:
+                print(f"[SKIP] Account {username} has insufficient RC mana. Skipping.")
+                return False
+
+            # Otherwise, retry with backoff
+            print(f"[WARN] Attempt {attempt+1} failed for {username}: {e}")
+            time.sleep(2 + attempt)  # incremental backoff
+    return False
+
+def post_test_thread(username, posting_key):
+    hive = Hive(keys=[posting_key], nodes=NODES, num_retries=5, retry_wait=2)
+
+    # Generate dynamic post
+    body = generate_random_post()
+    title = generate_random_title()
+    permlink = generate_permlink(title)
+
+    success = safe_post(hive, title, body, permlink, username)
+    
+    # Optional: random short delay between posts to reduce node overload
+    time.sleep(random.uniform(1, 5))
+    return success
 
 def process_account_file(file_name):
     file_path = os.path.join(FOLDER_PATH, file_name)
     username = file_name.replace(".txt", "")
     posting_key, active_key = extract_keys(file_path)
+
     if not posting_key:
         print(f"[WARN] Posting key not found in {file_name}, skipping.")
+        # Remove file anyway
+        try:
+            os.remove(file_path)
+            print(f"[INFO] Removed account file {file_name}.")
+        except Exception as e:
+            print(f"[WARN] Could not remove {file_name}: {str(e)}")
         return
 
     success = post_test_thread(username, posting_key)
-    if success:
-        try:
-            os.remove(file_path)
-            print(f"[INFO] Removed account file {file_name} after successful post.")
-        except Exception as e:
-            print(f"[WARN] Could not remove {file_name}: {str(e)}")
-    else:
-        print(f"[WARN] Post failed for {username}, file not removed.")
+
+    # --- Delete file regardless of outcome ---
+    try:
+        os.remove(file_path)
+        print(f"[INFO] Removed account file {file_name} after processing (success/skipped/failed).")
+    except Exception as e:
+        print(f"[WARN] Could not remove {file_name}: {str(e)}")
+
+# ======= MAIN SCRIPT =======
 
 def main():
+    # --- Step 1: Post first with the primary account ---
     print(f"[INFO] Posting first blog as primary account: {PRIMARY_USERNAME}")
     post_test_thread(PRIMARY_USERNAME, PRIMARY_POSTING_KEY)
-    print(f"[INFO] Primary account post complete.")
+    print(f"[INFO] Primary account post complete. Proceeding to other accounts...\n")
+
+    # --- Step 2: Process all other account files concurrently (3 at a time) ---
+    while True:
+        files = [f for f in os.listdir(FOLDER_PATH) if f.endswith(".txt")]
+        if not files:
+            print("✅ All account files have been posted or processed. Exiting.")
+            break
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [executor.submit(process_account_file, file_name) for file_name in files]
+            for future in as_completed(futures):
+                future.result()
 
 if __name__ == "__main__":
     main()

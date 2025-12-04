@@ -1,10 +1,6 @@
 import os
 import re
-import datetime
-import json
 import time
-import random
-import requests
 from beem import Hive
 from beem.comment import Comment
 from beem.account import Account
@@ -12,17 +8,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ================== CONFIG ==================
 FOLDER_PATH = "hive_accounts_1"  # folder containing .txt files with keys
-TARGET_AUTHOR = "qring"  # author whose latest post will be voted/commented
-
-# --- Read Gemini API key from file ---
-with open("gemini_api.txt", "r") as f:
-    GEMINI_API_KEY = f.read().strip()
-
-MODEL = "gemini-2.0-flash"
-MIN_COMMENT_LENGTH = 20
-MAX_COMMENT_LENGTH = 100
-CONCURRENT_WORKERS = 6
+TARGET_AUTHOR = "qring"  # author whose latest post will be voted
+CONCURRENT_WORKERS = 2  # reduce concurrency to ~2 accounts/sec
+VOTE_WEIGHT = 20  # 20% vote
+SLEEP_BETWEEN_ACCOUNTS = 0.5  # 0.5 sec between accounts → 2 accounts/sec
 # ============================================
+
 
 def extract_posting_key(file_path):
     """Extract posting key from a Hive account file"""
@@ -33,18 +24,21 @@ def extract_posting_key(file_path):
 
 
 def get_latest_post(author, hive_instance):
-    """Return the latest blog post's author, permlink, and content"""
+    """Return the latest blog post's author and permlink"""
     try:
         account = Account(author, blockchain_instance=hive_instance)
         max_op = account.virtual_op_count()
         stop_op = max_op - 500
+
         for post in account.history_reverse(start=max_op, stop=stop_op, use_block_num=False, only_ops=["comment"]):
             op = post if isinstance(post, dict) else post.get("op", [None, {}])[1]
+
             if op.get("parent_author") == "" and op.get("author") == author:
-                return op["author"], op["permlink"], op.get("body", "")
+                return op["author"], op["permlink"]
     except Exception:
         pass
-    return None, None, None
+
+    return None, None
 
 
 def already_voted(voter, author, permlink, hive_instance):
@@ -59,95 +53,55 @@ def already_voted(voter, author, permlink, hive_instance):
     return None
 
 
-def generate_comment(post_content, post_url):
-    """
-    Use Gemini API to generate a comment relevant to the post content.
-    All logs are silenced. Fail quietly.
-    """
-    prompt = (
-        f"Read the following Hive blog post and write an engaging comment between {MIN_COMMENT_LENGTH}-{MAX_COMMENT_LENGTH} characters "
-        f"that is relevant to the post:\n\nPost URL: {post_url}\nPost Content: {post_content}"
-    )
-
-    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
-    headers = {"Content-Type": "application/json"}
-    data = {"contents": [{"parts": [{"text": prompt}]}]}
-
-    # silent retry loop
-    for _ in range(4):
-        try:
-            response = requests.post(f"{endpoint}?key={GEMINI_API_KEY}", headers=headers, data=json.dumps(data))
-            if response.status_code == 200:
-                result = response.json()
-                txt = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-                if len(txt) >= MIN_COMMENT_LENGTH:
-                    return txt[:MAX_COMMENT_LENGTH]
-        except:
-            pass
-        time.sleep(3)
-
-    # fallback — silent generic comment
-    return "Great post! Thanks for sharing your thoughts."
-
-
-def vote_and_comment(username, posting_key, author, permlink, post_content):
-    """Vote 20% and comment on the latest post"""
+def vote_only(username, posting_key, author, permlink):
+    """Vote 20% on the latest post"""
     hive_instance = Hive(keys=[posting_key])
-    post_url = f"https://hive.blog/@{author}/{permlink}"
-
     vote_status = already_voted(username, author, permlink, hive_instance)
 
     if vote_status is None:
         try:
             c = Comment(f"@{author}/{permlink}", blockchain_instance=hive_instance)
-            c.upvote(weight=20, voter=username)
-            print(f"[INFO] Voted 20% successfully as {username}")
-            time.sleep(2)
+            c.upvote(weight=VOTE_WEIGHT, voter=username)
+            print(f"[INFO] Voted {VOTE_WEIGHT}% successfully as {username}")
+            time.sleep(SLEEP_BETWEEN_ACCOUNTS)
+            return True
         except Exception as e:
             print(f"[ERROR] Voting failed for {username}: {e}")
             return False
     else:
-        print(f"[INFO] {username} already voted with {vote_status/20}%")
-
-    # Generate and post a quiet comment
-    comment_text = generate_comment(post_content, post_url)
-
-    try:
-        c = Comment(f"@{author}/{permlink}", blockchain_instance=hive_instance)
-        c.reply(comment_text, author=username)
-        print(f"[INFO] Comment posted successfully by {username}")
-    except Exception as e:
-        print(f"[ERROR] Failed to post comment for {username}: {e}")
-        return False
-
-    return True
+        print(f"[INFO] {username} already voted with {vote_status / 100}%")
+        time.sleep(SLEEP_BETWEEN_ACCOUNTS)
+        return True
 
 
-def process_account(file_name, author, permlink, post_content):
-    """Process a single account: vote and comment, then remove file if successful"""
+def process_account(file_name, author, permlink):
+    """Process a single account: vote only, then remove file immediately"""
     file_path = os.path.join(FOLDER_PATH, file_name)
     username = file_name.replace(".txt", "")
 
     posting_key = extract_posting_key(file_path)
     if not posting_key:
         print(f"[WARN] Posting key not found in {file_name}, skipping.")
-        return
-
-    success = vote_and_comment(username, posting_key, author, permlink, post_content)
-
-    if success:
         try:
             os.remove(file_path)
-            print(f"[INFO] Removed account file {file_name}")
-        except Exception as e:
-            print(f"[WARN] Could not remove {file_name}: {e}")
-    else:
-        print(f"[WARN] Action failed for {username}, file not removed.")
+        except:
+            pass
+        return
+
+    # Vote
+    vote_only(username, posting_key, author, permlink)
+
+    # Delete account immediately after vote
+    try:
+        os.remove(file_path)
+        print(f"[INFO] Removed account file {file_name} after processing.")
+    except Exception as e:
+        print(f"[WARN] Could not remove {file_name}: {e}")
 
 
 def main():
     hive_instance = Hive()
-    author, permlink, post_content = get_latest_post(TARGET_AUTHOR, hive_instance)
+    author, permlink = get_latest_post(TARGET_AUTHOR, hive_instance)
 
     if not author:
         print(f"[WARN] No blog post found for {TARGET_AUTHOR}. Exiting.")
@@ -160,14 +114,12 @@ def main():
             break
 
         with ThreadPoolExecutor(max_workers=CONCURRENT_WORKERS) as executor:
-            futures = [
-                executor.submit(process_account, f, author, permlink, post_content)
-                for f in files
-            ]
+            futures = [executor.submit(process_account, f, author, permlink) for f in files]
             for future in as_completed(futures):
                 future.result()
 
-        time.sleep(2)
+        # Add a small pause before next batch
+        time.sleep(1)
 
 
 if __name__ == "__main__":

@@ -92,7 +92,7 @@ def follow_user_task(file_name):
 def main():
     print(f"Starting mass-follow → @{TARGET_USER}\n")
     count = 0
-    max_workers = 6  # concurrent threads
+    max_workers = 2  # concurrent threads
 
     while True:
         files = [f for f in os.listdir(FOLDER_PATH) if f.endswith(".txt")]

@@ -11,7 +11,7 @@ from beem.account import Account
 # ---------------- Config ----------------
 FOLDER_PATH = "hive_accounts_3"
 NODES = ["https://api.openhive.network"]
-CONCURRENT_THREADS = 6
+CONCURRENT_THREADS = 2
 
 # ---------------- Read Gemini API Key ----------------
 with open("gemini_api.txt", "r") as f:
