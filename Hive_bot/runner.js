@@ -1,10 +1,11 @@
 const { exec, spawn } = require('child_process');
 
+// List of scripts; disabled: true will skip running it
 const scripts = [
-    { name: "blog_post", cmd: "python3", args: ["-u", "blog_post.py"] }, // <-- moved up
-    { name: "vote", cmd: "python3", args: ["-u", "vote.py"] },
-    { name: "follow", cmd: "python3", args: ["-u", "follow.py"] },
-    { name: "pro_update", cmd: "python3", args: ["-u", "pro_update.py"] },
+    { name: "blog_post", cmd: "python3", args: ["-u", "blog_post.py"], disabled: false },
+    { name: "vote", cmd: "python3", args: ["-u", "vote.py"], disabled: false },
+    { name: "follow", cmd: "python3", args: ["-u", "follow.py"], disabled: true }, // currently skipped
+    { name: "pro_update", cmd: "python3", args: ["-u", "pro_update.py"], disabled: true }, // currently skipped
 ];
 
 let index = 0;
@@ -13,7 +14,7 @@ function log(name, data) {
     process.stdout.write(`[${name}] ${data}`);
 }
 
-// run downloader.js first
+// Run downloader.js first
 function runDownloader() {
     console.log("\n=== DOWNLOADER START ===\n");
 
@@ -33,15 +34,21 @@ function runDownloader() {
     });
 }
 
-// run scripts sequentially
+// Run scripts sequentially
 function runNextScript() {
     if (index >= scripts.length) {
         console.log("\n=== ALL SCRIPTS FINISHED ===\n");
         return;
     }
 
-    const { name, cmd, args } = scripts[index];
+    const { name, cmd, args, disabled } = scripts[index];
     index++;
+
+    if (disabled) {
+        console.log(`\n=== SKIPPING ${name} ===\n`);
+        runNextScript();
+        return;
+    }
 
     console.log(`\n=== START ${name} ===\n`);
 
@@ -62,5 +69,5 @@ function runNextScript() {
     });
 }
 
-// start the workflow
+// Start the workflow
 runDownloader();
