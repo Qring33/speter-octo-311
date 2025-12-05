@@ -6,7 +6,7 @@ const DROPBOX_REFRESH_TOKEN = "aKyyc46BzjsAAAAAAAAAAflNqCXbvJtQ75QkrOK3GGJKTEHbE
 const DROPBOX_APP_KEY = "89qh2irwhtm9nh3";
 const DROPBOX_APP_SECRET = "n3al44m84jg1i3q";
 
-const LOCAL_FOLDERS = ["account", "keystone_phase", "hive_accounts"];
+const LOCAL_FOLDERS = ["account", "keystone_phase", "hive_accounts_2.0"];
 const DROPBOX_ROOT = "/";
 
 function getDropboxClient() {
