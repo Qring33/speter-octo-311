@@ -86,7 +86,7 @@ def extract_first_paragraph(text):
 
 def safe_post(hive, title, body, permlink, username):
     json_metadata = {
-        "tags": ["web3", "blockchain", "tech", "business", "LeoFinance", "daily", "Photography", "hive"],
+        "tags": ["web3", "blockchain", "tech", "HIVE-167922", "LeoFinance", "daily", "Photography", "hive"],
         "app": "inleo/1.0"
     }
 
