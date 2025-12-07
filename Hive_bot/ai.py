@@ -1,5 +1,4 @@
 import random
-import random
 import datetime
 
 # ======= MASSIVELY EXPANDED WORD LISTS (2025-Ready, Hashtag-Free) =======
@@ -78,56 +77,32 @@ emojis_list = [
     "Seedling", "Telescope", "Chart Decreasing", "Key", "Shield", "Magnifying Glass Tilting Left"
 ]
 
-# ======= 20 SOPHISTICATED TEMPLATES (Professional & Addictive to Read) =======
+# ======= 20 CLEAN TEMPLATES (Removed first-line headers) =======
 templates = [
-    "Observation: {{topic}} continues {{action}} while most remain focused elsewhere.\nSentiment sits at {{sentiment}} levels.\n{{connector}}, {{conclusion}}.\nThis remains a {{adjective}} opportunity for those willing to think {{adverb}} and act {{tone}}.",
+    "{{topic}} continues {{action}} while most remain focused elsewhere. Sentiment sits at {{sentiment}} levels. {{connector}}, {{conclusion}}. This remains a {{adjective}} opportunity for those willing to think {{adverb}} and act {{tone}}.",
 
-    "Current assessment:\n{{topic}} → {{action}}\nMarket sentiment → {{sentiment}}\n{{connector}}, {{conclusion}}\nPositioning {{adverb}} into {{adjective}} conviction themes continues to make sense {{emoji}}",
+    "{{topic}} → {{action}}. Market sentiment → {{sentiment}}. {{connector}}, {{conclusion}}. Positioning {{adverb}} into {{adjective}} conviction themes continues to make sense {{emoji}}",
 
-    "The quiet truth: {{topic}} has been {{action}} for months.\nRetail sentiment remains {{sentiment}}.\nSmart money behavior suggests otherwise.\n{{connector}}, {{conclusion}}\nStaying {{adjective}} and accumulating {{adverb}}.",
+    "{{topic}} has been {{action}} for months. Retail sentiment remains {{sentiment}}. Smart money behavior suggests otherwise. {{connector}}, {{conclusion}}. Staying {{adjective}} and accumulating {{adverb}}.",
 
-    "2025 thesis update:\n{{topic}} is {{action}} exactly as projected in this cycle phase.\nBroader sentiment still pricing in {{sentiment}} outcomes.\n{{connector}}, {{conclusion}}\nThe risk/reward skew remains {{adjective}} when positioned {{adverb}}.",
+    "{{topic}} is {{action}} exactly as projected in this cycle phase. Broader sentiment still pricing in {{sentiment}} outcomes. {{connector}}, {{conclusion}}. The risk/reward skew remains {{adjective}} when positioned {{adverb}}.",
 
-    "Not financial advice, but worth noting:\n{{topic}} showing textbook {{action}}.\nFear/greed currently reading {{sentiment}}.\n{{connector}}, {{conclusion}}\nPersonally remaining {{tone}} on this name {{emoji}}",
+    "{{topic}} showing textbook {{action}}. Fear/greed currently reading {{sentiment}}. {{connector}}, {{conclusion}}. Personally remaining {{tone}} on this name {{emoji}}",
 
-    "Pattern recognition:\nWe've seen {{topic}} {{action}} during similar macro regimes before.\nCurrent sentiment mirrors past {{sentiment}} phases perfectly.\n{{connector}}, {{conclusion}}\nHistory favors the {{adjective}} and {{adverb}}-positioned.",
+    "We've seen {{topic}} {{action}} during similar macro regimes before. Current sentiment mirrors past {{sentiment}} phases perfectly. {{connector}}, {{conclusion}}. History favors the {{adjective}} and {{adverb}}-positioned.",
 
-    "Under-the-radar development:\n{{topic}} quietly {{action}} amid louder narratives.\nOn-chain + sentiment data both confirming {{sentiment}} shift.\n{{connector}}, these setups often precede {{adjective}} moves when executed {{adverb}}.",
+    "{{topic}} quietly {{action}} amid louder narratives. On-chain + sentiment data both confirming {{sentiment}} shift. {{connector}}, these setups often precede {{adjective}} moves when executed {{adverb}}.",
 
-    "Long-form thought:\n{{topic}} has spent the last quarter {{action}}.\nYet the narrative remains stuck in {{sentiment}} mode.\n{{connector}}, such disconnects are where {{adjective}} wealth is built — provided one moves {{adverb}} and stays {{tone}}.",
+    "{{topic}} has spent the last quarter {{action}}. Yet the narrative remains stuck in {{sentiment}} mode. {{connector}}, such disconnects are where {{adjective}} wealth is built — provided one moves {{adverb}} and stays {{tone}}.",
 
-    "Simple framework:\nIf {{topic}} continues {{action}}, and sentiment stays {{sentiment}},\nthen {{conclusion}}.\nThat probability feels {{adjective}} from current levels when deployed {{adverb}}.",
+    "If {{topic}} continues {{action}}, and sentiment stays {{sentiment}}, then {{conclusion}}. That probability feels {{adjective}} from current levels when deployed {{adverb}}.",
 
-    "Final thought tonight:\n{{topic}} is either {{action}} — or setting up for something much larger.\nEither way, {{conclusion}}.\nI choose to remain {{adjective}}, {{adverb}}, and {{tone}} {{emoji}}"
+    "{{topic}} is either {{action}} — or setting up for something much larger. Either way, {{conclusion}}. I choose to remain {{adjective}}, {{adverb}}, and {{tone}} {{emoji}}"
 ]
-
-# ======= TITLE TEMPLATES (Clean & Click-Worthy) =======
-title_templates = [
-    "{{topic}} – {{title_adj}} {{date}}",
-    "Weekend Reflection: {{title_adj}}",
-    "Sunday Alpha Drop {{date}}",
-    "Market Note: {{topic}}",
-    "Quiet Observation No. {{random_num}}",
-    "Conviction Update – {{date}}",
-    "Thread: {{title_adj}} on {{topic}}",
-    "GM. One Thought for {{date}}",
-    "Closing Thought: {{title_adj}}",
-    "Cycle Context {{date}}: {{topic}}"
-]
-
-title_adjectives = ["Update", "Assessment", "Observation", "Framework", "Conviction Check", "Pattern", "Signal", "Reflection", "Thread", "Note"]
 
 # ======= GENERATOR FUNCTIONS =======
 def random_emoji():
     return random.choice(emojis_list)
-
-def generate_random_title():
-    template = random.choice(title_templates)
-    date_str = datetime.datetime.now().strftime('%b %d, %Y')
-    return template.replace("{{topic}}", random.choice(topics)) \
-                   .replace("{{title_adj}}", random.choice(title_adjectives)) \
-                   .replace("{{date}}", date_str) \
-                   .replace("{{random_num}}", str(random.randint(41, 99)))
 
 def generate_random_post():
     template = random.choice(templates)
@@ -145,6 +120,6 @@ def generate_random_post():
 if __name__ == "__main__":
     print("Generating 10 ultra-clean, professional-grade posts (zero hashtags)\n" + "="*70)
     for i in range(10):
-        print(f"{i+1}. {generate_random_title()}\n")
+        print(f"{i+1}.\n")
         print(generate_random_post())
         print("\n" + "—" * 70 + "\n")
