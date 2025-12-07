@@ -68,6 +68,12 @@ def extract_keys(file_path):
 def generate_permlink(title):
     permlink = title.lower()
     permlink = re.sub(r'[^a-z0-9]+', '-', permlink).strip('-')
+
+    # Truncate safely to leave room for timestamp (-YYYYMMDDHHMMSS)
+    max_len = 256 - 15
+    if len(permlink) > max_len:
+        permlink = permlink[:max_len].rstrip('-')
+
     permlink += "-" + datetime.datetime.now().strftime('%Y%m%d%H%M%S')
     return permlink
 
@@ -75,14 +81,15 @@ def clean_title(title):
     return re.sub(r'\d{4}-\d{2}-\d{2}.*$', '', title).strip()
 
 def extract_sentences(text):
-    """Return a list of sentences ending with '.'"""
-    return re.findall(r'[^.]*\.', text)
+    """Return a list of sentences using '.' or line breaks as separators"""
+    sentences = re.split(r'\.|\n', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    return sentences
 
 def select_title_from_body(body, max_len=210):
     """Select first sentence <= max_len; try second, third, etc."""
     sentences = extract_sentences(body)
     for sentence in sentences:
-        sentence = sentence.strip()
         if len(sentence) <= max_len:
             return sentence
     # fallback: truncate first sentence
