@@ -7,8 +7,8 @@ import requests
 from beem import Hive
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# AI text generators
-from ai import generate_random_post, generate_random_title, datetime
+# AI text generator (only post content; title generation removed)
+from ai import generate_random_post, datetime
 
 FOLDER_PATH = "hive_accounts"
 
@@ -132,15 +132,10 @@ def post_test_thread(username, posting_key):
     # Generate blog content
     body = generate_random_post().strip()
 
-    # Title generation from first valid sentence
+    # Title selection from first valid sentence in body
     base_title = select_title_from_body(body, max_len=210)
-
-    # Optional: prepend raw AI title if you want short prefix
-    raw_title = generate_random_title()
-    raw_title_clean = clean_title(raw_title)
-    final_title = f"{raw_title_clean}: {base_title}"
+    final_title = base_title
     if len(final_title) > 255:
-        # truncate safely
         final_title = final_title[:255].rsplit(' ', 1)[0]
 
     # Image query using first word of title
