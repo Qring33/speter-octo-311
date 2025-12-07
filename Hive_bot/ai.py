@@ -72,8 +72,11 @@ tones = [
     "macro-aware", "cycle-tested", "battle-scarred", "long-term greedy", "short-term respectful"
 ]
 
-emojis_list = ["Rocket, Chart Increasing, Diamond Hands, Crystal Ball, Hourglass, Eyes, Brain, Bull, Bear, Fire, Lightning,
-               Seedling, Telescope, Chart Decreasing, Key, Shield, Magnifying Glass Tilting Left]
+emojis_list = [
+    "Rocket", "Chart Increasing", "Diamond Hands", "Crystal Ball", "Hourglass",
+    "Eyes", "Brain", "Bull", "Bear", "Fire", "Lightning",
+    "Seedling", "Telescope", "Chart Decreasing", "Key", "Shield", "Magnifying Glass Tilting Left"
+]
 
 # ======= 20 SOPHISTICATED TEMPLATES (Professional & Addictive to Read) =======
 templates = [
