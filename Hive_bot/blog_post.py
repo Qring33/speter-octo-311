@@ -74,11 +74,19 @@ def generate_permlink(title):
 def clean_title(title):
     return re.sub(r'\d{4}-\d{2}-\d{2}.*$', '', title).strip()
 
-def extract_first_paragraph(text):
-    m = re.search(r'\.', text)
-    if not m:
-        return text.strip()
-    return text[:m.start() + 1].strip()
+def extract_sentences(text):
+    """Return a list of sentences ending with '.'"""
+    return re.findall(r'[^.]*\.', text)
+
+def select_title_from_body(body, max_len=210):
+    """Select first sentence <= max_len; try second, third, etc."""
+    sentences = extract_sentences(body)
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if len(sentence) <= max_len:
+            return sentence
+    # fallback: truncate first sentence
+    return sentences[0][:max_len] if sentences else "Untitled"
 
 # ---------------------------
 # Post handling
@@ -124,29 +132,28 @@ def post_test_thread(username, posting_key):
     # Generate blog content
     body = generate_random_post().strip()
 
-    # First sentence for header
-    intro = extract_first_paragraph(body)
+    # Title generation from first valid sentence
+    base_title = select_title_from_body(body, max_len=210)
 
-    # Title generation
+    # Optional: prepend raw AI title if you want short prefix
     raw_title = generate_random_title()
-    base_title = clean_title(raw_title)
-    final_title = f"{base_title}: {intro}"
+    raw_title_clean = clean_title(raw_title)
+    final_title = f"{raw_title_clean}: {base_title}"
+    if len(final_title) > 255:
+        # truncate safely
+        final_title = final_title[:255].rsplit(' ', 1)[0]
 
-    # Image query using first word of base_title
+    # Image query using first word of title
     query = base_title.split(" ")[0]
     image_url = get_pixabay_image(query)
 
     # Insert image with empty alt text to avoid visible "Image" caption
     if image_url:
         body = f"![]({image_url})\n\n{body}"
-
-        # Safety: remove accidental "Image" or "ImageIn" prefix that may appear immediately after the image block
         body = re.sub(r'(!\[\]\(.*?\)\s*\n+)\s*(?:Image|ImageIn)\b', r'\1', body, flags=re.I)
 
     permlink = generate_permlink(final_title)
-
     success = safe_post(hive, final_title, body, permlink, username)
-
     time.sleep(random.uniform(1, 5))
     return success
 
