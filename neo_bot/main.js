@@ -1,0 +1,229 @@
+const { chromium } = require("playwright-extra");
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
+
+// Paths
+const accountsDir = path.join(__dirname, "neobux_accounts");
+if (!fs.existsSync(accountsDir)) fs.mkdirSync(accountsDir);
+const accountsFile = path.join(accountsDir, "neobux_accounts.json");
+
+// Load already used User-Agents
+function getUsedUAs() {
+  if (!fs.existsSync(accountsFile)) return [];
+  try {
+    const data = JSON.parse(fs.readFileSync(accountsFile, "utf8"));
+    return Array.isArray(data) ? data.map(a => a.user_agent).filter(Boolean) : [];
+  } catch { return []; }
+}
+const usedUAs = getUsedUAs();
+
+// Load valid + unused User-Agents (keep original string with prefix like "Chrome: ")
+const allUAs = fs.readFileSync("user_agents.txt", "utf8")
+  .split("\n")
+  .map(l => l.trim())
+  .filter(Boolean);
+
+const validUAs = allUAs
+  .filter(ua => {
+    const clean = ua.replace(/^(Chrome|Edge|Firefox):/i, "").trim();
+    return !/android/i.test(clean) && !/(Windows NT [56]\.|rv:1[11]\.|Firefox\/[1-4]\d|Chrome\/[1-4]\d)/i.test(clean);
+  })
+  .filter(ua => !usedUAs.includes(ua));
+
+if (validUAs.length === 0) throw new Error("No unused valid User-Agent left!");
+
+const selectedUA = validUAs[Math.floor(Math.random() * validUAs.length)];
+
+let email, password;
+try {
+  const out = execSync("python3 gmail_generator.py new", { encoding: "utf8" }).trim();
+  const m = out.match(/([^\s]+@wixnation\.com)\s+([A-Za-z0-9]+)/);
+  if (!m) throw new Error("Could not parse email/password");
+  email = m[1].toLowerCase();
+  password = m[2];
+} catch (e) { throw new Error("gmail_generator.py failed: " + e.message); }
+
+console.log("Selected UA :", selectedUA);
+console.log("Email       :", email);
+console.log("Password    :", password);
+
+const names = fs.readFileSync("name.txt", "utf8")
+  .split("\n")
+  .map(l => l.trim().toLowerCase())
+  .filter(Boolean);
+
+function getUsername() {
+  const s = [...names].sort(() => Math.random() - 0.5);
+  return (s[0] + s[1]).slice(0, 14);
+}
+function getBirthYear() { return String(1990 + Math.floor(Math.random() * 19)); }
+
+// Robust CAPTCHA solver — retries with page refresh if solver returns bad result
+async function solveCaptchaRobust(page, username, email, password, birthYear) {
+  for (let i = 1; i <= 3; i++) {
+    console.log(`Solving CAPTCHA (attempt ${i}/3)...`);
+    await page.waitForSelector('td[align="right"] > img[width="91"][height="24"]', { timeout: 30000 });
+    const src = await page.$eval('td[align="right"] > img[width="91"][height="24"]', el => el.src);
+
+    let buffer;
+    if (src.startsWith("data:image")) {
+      buffer = Buffer.from(src.split(",")[1], "base64");
+    } else {
+      const url = src.startsWith("http") ? src : `https://www.neobux.com${src}`;
+      buffer = await (await page.request.get(url)).body();
+    }
+    fs.writeFileSync("cap.png", buffer);
+
+    const solved = execSync("node image_solver.js", { encoding: "utf8" }).trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 5);
+
+    if (solved.length === 5) {
+      await page.fill('input#codigo[name="codigo"]', solved);
+      console.log("CAPTCHA solved:", solved);
+      return solved;
+    }
+
+    console.log(`Bad CAPTCHA result: "\( {solved}" refreshing page (retry \){i + 1})`);
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+
+    // Re-fill everything after refresh
+    await page.fill('input#nomedeutilizador', username);
+    await page.fill('input[name="palavrapasse"]', password);
+    await page.fill('input#palavrapasseconfirmacao', password);
+    await page.fill('input#emailprincipal', email);
+    await page.fill('input#anonascimento', birthYear);
+    await page.check('input#tosagree');
+    await page.check('input#ppagree');
+  }
+  throw new Error("CAPTCHA solver failed after 3 attempts");
+}
+
+function getOTP(email) {
+  for (let i = 0; i < 10; i++) {
+    try {
+      const out = execSync(`python3 gmail_generator.py inbox ${email}`, { encoding: "utf8" }).trim();
+      const m = out.match(/\b[A-Z0-9]{12}\b/);
+      if (m) {
+        console.log("OTP received:", m[0]);
+        return m[0];
+      }
+    } catch { }
+    execSync("sleep 6");
+  }
+  throw new Error("No OTP received");
+}
+
+async function hasCaptchaError(page) {
+  return await page.$('div.f_r > ul > li:has-text("Enter the text shown on the image.")') !== null;
+}
+
+(async () => {
+  const browser = await chromium.launchPersistentContext("./browser_profile", {
+    headless: false,
+    locale: "en-US",
+    userAgent: selectedUA,
+    timezoneId: "America/New_York",
+    viewport: null,
+    args: [
+      "--disable-blink-features=AutomationControlled",
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-web-security",
+      "--disable-features=IsolateOrigins,site-per-process",
+      "--window-size=1280,900"
+    ],
+  });
+
+  const page = await browser.newPage();
+  await page.goto("https://www.neobux.com/m/r/", { waitUntil: "domcontentloaded", timeout: 60000 });
+
+  const username = getUsername();
+  const birthYear = getBirthYear();
+
+  // Initial fill
+  await page.fill('input#nomedeutilizador', username);
+  await page.fill('input[name="palavrapasse"]', password);
+  await page.fill('input#palavrapasseconfirmacao', password);
+  await page.fill('input#emailprincipal', email);
+  await page.fill('input#anonascimento', birthYear);
+  await page.check('input#tosagree');
+  await page.check('input#ppagree');
+
+  // First step
+  await solveCaptchaRobust(page, username, email, password, birthYear);
+  await page.click('a.button.medium.green#botao_registo');
+
+  let step1Ok = false;
+  for (let a = 1; a <= 5; a++) {
+    try {
+      await page.waitForSelector('input#val_em_1[name="val_em_1"]', { state: "visible", timeout: 12000 });
+      step1Ok = true;
+      break;
+    } catch {
+      if (await hasCaptchaError(page)) {
+        console.log("Wrong CAPTCHA (step 1) refreshing & retrying");
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.fill('input#nomedeutilizador', username);
+        await page.fill('input[name="palavrapasse"]', password);
+        await page.fill('input#palavrapasseconfirmacao', password);
+        await page.fill('input#emailprincipal', email);
+        await page.fill('input#anonascimento', birthYear);
+        await page.check('input#tosagree');
+        await page.check('input#ppagree');
+        await solveCaptchaRobust(page, username, email, password, birthYear);
+        await page.click('a.button.medium.green#botao_registo');
+      }
+    }
+  }
+  if (!step1Ok) throw new Error("Failed step 1");
+
+  const otp = getOTP(email);
+  await page.fill('input#val_em_1[name="val_em_1"]', otp);
+
+  // Optional final CAPTCHA (if present)
+  try {
+    await page.waitForSelector('td[align="right"] > img[width="91"][height="24"]', { timeout: 8000 });
+    await solveCaptchaRobust(page, username, email, password, birthYear);
+  } catch {}
+
+  // Final registration
+  let success = false;
+  for (let a = 1; a <= 5; a++) {
+    await page.click('a.button.medium.blue#botao_registo');
+    try {
+      await page.waitForURL("https://www.neobux.com/m/r1/", { timeout: 12000 });
+      success = true;
+      console.log("REGISTRATION SUCCESS!");
+      break;
+    } catch {
+      if (await hasCaptchaError(page)) {
+        console.log("Final step failed refresh + re-enter OTP + new CAPTCHA");
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.fill('input#val_em_1[name="val_em_1"]', otp);
+        await solveCaptchaRobust(page, username, email, password, birthYear);
+      }
+    }
+  }
+  if (!success) throw new Error("Registration failed");
+
+  // Save account with UA
+  const newAcc = { user_agent: selectedUA, username, email, password };
+  let list = fs.existsSync(accountsFile) ? JSON.parse(fs.readFileSync(accountsFile, "utf8")) : [];
+  if (!Array.isArray(list)) list = [];
+  list.push(newAcc);
+  fs.writeFileSync(accountsFile, JSON.stringify(list, null, 2));
+
+  console.log("\nACCOUNT SAVED accounts/neobux_accounts.json");
+  console.log(`UA      : ${selectedUA}`);
+  console.log(`Username: ${username}`);
+  console.log(`Email   : ${email}`);
+  console.log(`Password: ${password}\n`);
+
+  console.log("Closing browser in 2s...");
+  await page.waitForTimeout(2000);
+  await browser.close();
+  console.log("Done.");
+})();
