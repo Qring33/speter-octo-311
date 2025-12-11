@@ -37,7 +37,7 @@ function runDownloader() {
 
 // Step 2: Read neobux_accounts.json and count entries
 function checkAccountsAndDecide() {
-  const filePath = path.join(__dirname, 'neobux_accounts.json');
+  const filePath = path.join(__dirname, 'neobux_accounts/neobux_accounts.json');
 
   fs.readFile(filePath, 'utf8', (err, data) => {
     if (err) {
