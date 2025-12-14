@@ -4,7 +4,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 const gaming = require("./gaming.js");
 
-const PARALLEL_JOBS = 2; // <==== CHANGE THIS TO 5, 10, ETC
+const PARALLEL_JOBS = 1; // <==== CHANGE THIS TO 5, 10, ETC
 const LAUNCH_DELAY_MS = 1000;
 
 const accountsDir = path.join(__dirname, "neobux_accounts");
