@@ -108,7 +108,7 @@ async function runJob(jobId) {
       if (!fs.existsSync(profilePath)) fs.mkdirSync(profilePath, { recursive: true });  
 
       const browser = await firefox.launchPersistentContext(profilePath, {  
-        headless: false,  
+        headless: true,  
         userAgent: acc.user_agent,  
         locale: "en-US",  
         timezoneId: "America/New_York",  
