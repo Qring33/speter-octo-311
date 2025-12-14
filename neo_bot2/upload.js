@@ -25,32 +25,15 @@ async function readDropboxJson(dbx, dropboxPath) {
         return JSON.parse(data);
     } catch (err) {
         if (err.status === 409) {
-            // File does not exist
             return null;
         }
         throw err;
     }
 }
 
-// Helper to upload file (with optional merge)
-async function uploadFile(dbx, localPath, dropboxPath, merge = false) {
-    let contents = fs.readFileSync(localPath, "utf8");
-
-    if (merge) {
-        let localData = JSON.parse(contents);
-        let dropboxData = await readDropboxJson(dbx, dropboxPath) || [];
-
-        // Merge arrays if both are arrays
-        if (Array.isArray(localData) && Array.isArray(dropboxData)) {
-            localData = [...dropboxData, ...localData];
-        }
-        // Merge objects if both are objects
-        else if (typeof localData === "object" && typeof dropboxData === "object") {
-            localData = { ...dropboxData, ...localData };
-        }
-
-        contents = JSON.stringify(localData, null, 2);
-    }
+// Helper to upload file
+async function uploadFile(dbx, localPath, dropboxPath) {
+    const contents = fs.readFileSync(localPath, "utf8");
 
     await dbx.filesUpload({
         path: dropboxPath,
@@ -66,10 +49,14 @@ async function uploadFiles(dbx, localFolder, dropboxFolder) {
         return;
     }
 
-    const files = fs.readdirSync(localFolder).filter(file => file.endsWith(".json") || file.endsWith(".txt"));
+    const files = fs.readdirSync(localFolder).filter(
+        file =>
+            (file.endsWith(".json") || file.endsWith(".txt")) &&
+            file !== "neobux_accounts.json" // ❌ explicitly excluded
+    );
 
     if (files.length === 0) {
-        console.log(`No .txt or .json files to upload in: ${localFolder}`);
+        console.log(`No valid files to upload in: ${localFolder}`);
         return;
     }
 
@@ -79,17 +66,15 @@ async function uploadFiles(dbx, localFolder, dropboxFolder) {
         const localPath = path.join(localFolder, filename);
         const dropboxPath = `${dropboxFolder}/${filename}`;
 
-        if (filename === "neobux_accounts.json") {
-            await uploadFile(dbx, localPath, dropboxPath, true); // merge
-            if (!isSessionFolder) console.log(`Uploaded: ${dropboxPath}`);
-        } else {
-            await uploadFile(dbx, localPath, dropboxPath, false); // overwrite
-            if (!isSessionFolder) console.log(`Uploaded: ${dropboxPath}`);
+        await uploadFile(dbx, localPath, dropboxPath);
+
+        if (!isSessionFolder) {
+            //console.log(`Uploaded: ${dropboxPath}`);
         }
     }
 
     if (isSessionFolder) {
-        console.log(`All session JSON files uploaded successfully.`);
+        //console.log(`All session JSON files uploaded successfully.`);
     }
 }
 

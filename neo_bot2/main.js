@@ -1,213 +1,213 @@
-const { firefox } = require("playwright-extra");
-const fs = require("fs");
-const path = require("path");
-const { execSync } = require("child_process");
-const gaming = require("./gaming.js");
+const { firefox } = require("playwright-extra");  
+const fs = require("fs");  
+const path = require("path");  
+const { execSync, spawnSync } = require("child_process");  
+const gaming = require("./gaming.js");  
+  
+const PARALLEL_JOBS = 1; // <==== CHANGE THIS TO 5, 10, ETC  
+const LAUNCH_DELAY_MS = 1000;  
+  
+const accountsDir = path.join(__dirname, "neobux_accounts");  
+const sourceAccountsFile = path.join(accountsDir, "neobux_accounts.json");  
+const runningAccountsFile = path.join(accountsDir, "running_accounts.json");  
+  
+// =========================  
+// INIT / RESET RUNNING POOL  
+// =========================  
+function resetRunningAccounts() {  
+  if (!fs.existsSync(sourceAccountsFile)) {  
+    console.log("Source accounts file missing. Exiting.");  
+    process.exit(0);  
+  }  
 
-const PARALLEL_JOBS = 1; // <==== CHANGE THIS TO 5, 10, ETC
-const LAUNCH_DELAY_MS = 1000;
+  fs.copyFileSync(sourceAccountsFile, runningAccountsFile);  
+  console.log("Running accounts reset from source.");  
+}  
+  
+// =========================  
+// GET & CONSUME ACCOUNT  
+// =========================  
+function getAndConsumeAccount() {  
+  let accounts = [];  
 
-const accountsDir = path.join(__dirname, "neobux_accounts");
-const sourceAccountsFile = path.join(accountsDir, "neobux_accounts.json");
-const runningAccountsFile = path.join(accountsDir, "running_accounts.json");
+  if (fs.existsSync(runningAccountsFile)) {  
+    try {  
+      accounts = JSON.parse(fs.readFileSync(runningAccountsFile, "utf8"));  
+    } catch {  
+      console.log("Failed to parse running accounts. Resetting...");  
+    }  
+  }  
 
-// =========================
-// INIT / RESET RUNNING POOL
-// =========================
-function resetRunningAccounts() {
-  if (!fs.existsSync(sourceAccountsFile)) {
-    console.log("Source accounts file missing. Exiting.");
-    process.exit(0);
-  }
+  if (!Array.isArray(accounts) || accounts.length === 0) {  
+    resetRunningAccounts();  
+    accounts = JSON.parse(fs.readFileSync(runningAccountsFile, "utf8"));  
+  }  
 
-  fs.copyFileSync(sourceAccountsFile, runningAccountsFile);
-  console.log("Running accounts reset from source.");
-}
+  const index = Math.floor(Math.random() * accounts.length);  
+  const acc = accounts[index];  
 
-// =========================
-// GET & CONSUME ACCOUNT
-// =========================
-function getAndConsumeAccount() {
-  if (!fs.existsSync(runningAccountsFile)) {
-    resetRunningAccounts();
-  }
+  accounts.splice(index, 1);  
+  fs.writeFileSync(runningAccountsFile, JSON.stringify(accounts, null, 2));  
 
-  let accounts;
-  try {
-    accounts = JSON.parse(fs.readFileSync(runningAccountsFile, "utf8"));
-  } catch {
-    resetRunningAccounts();
-    accounts = JSON.parse(fs.readFileSync(runningAccountsFile, "utf8"));
-  }
+  // Run upload.js immediately after consuming an account
+  try {  
+    console.log(`[ACCOUNT ${acc.username}] Running upload.js`);  
+    execSync(`node upload.js ${acc.username}`, { stdio: "inherit" });  
+  } catch (err) {  
+    console.log(`[ACCOUNT ${acc.username}] upload.js failed: ${err.message}`);  
+  }  
 
-  if (!Array.isArray(accounts) || accounts.length === 0) {
-    resetRunningAccounts();
-    accounts = JSON.parse(fs.readFileSync(runningAccountsFile, "utf8"));
-  }
+  return acc;  
+}  
+  
+// =========================  
+// SINGLE JOB  
+// =========================  
+async function runJob(jobId) {  
+  let acc;  
+  let attemptCount = 0;  
+  const maxAttempts = 10; // prevent infinite loop if many invalid accounts  
 
-  const index = Math.floor(Math.random() * accounts.length);
-  const acc = accounts[index];
+  while (attemptCount < maxAttempts) {  
+    attemptCount++;  
+    try {  
+      acc = getAndConsumeAccount();  
+    } catch {  
+      console.log(`[JOB ${jobId}] Failed to obtain account.`);  
+      return;  
+    }  
 
-  accounts.splice(index, 1);
-  fs.writeFileSync(runningAccountsFile, JSON.stringify(accounts, null, 2));
+    console.log(`[JOB ${jobId}] Using account: ${acc.username}`);  
 
-  return acc;
-}
+    try {  
+      const sessionFolder = path.join(__dirname, "session");  
+      const sessionFile = path.join(sessionFolder, `${acc.username}.json`);  
 
-// =========================
-// SINGLE JOB
-// =========================
-async function runJob(jobId) {
-  let acc;
+      // =========================  
+      // RUN LOGIN.JS AND HANDLE ACCOUNT STATUS  
+      // =========================  
+      let loginSuccess = false;  
+      while (!loginSuccess) {  
+        console.log(`[JOB ${jobId}] Running login.js for ${acc.username}`);  
+        const result = spawnSync("node", ["login.js", acc.username], { stdio: "inherit" });  
 
-  try {
-    acc = getAndConsumeAccount();
-  } catch {
-    console.log(`[JOB ${jobId}] Failed to obtain account.`);
-    return;
-  }
+        if (result.status === 0) {  
+          console.log(`[JOB ${jobId}] Login successful for ${acc.username}`);  
+          loginSuccess = true;  
+          break;  
+        } else if (result.status === 1) {  
+          console.log(`[JOB ${jobId}] Account doesn't exist, selecting another account`);  
+          acc = getAndConsumeAccount();  
+        } else {  
+          console.log(`[JOB ${jobId}] Login failed unexpectedly. Aborting job.`);  
+          return;  
+        }  
+      }  
 
-  console.log(`[JOB ${jobId}] Using account: ${acc.username}`);
+      const profilePath = path.join(__dirname, "browser_profile", acc.username);  
+      if (!fs.existsSync(profilePath)) fs.mkdirSync(profilePath, { recursive: true });  
 
-  try {
-    const sessionFolder = path.join(__dirname, "session");
-    const sessionFile = path.join(sessionFolder, `${acc.username}.json`);
+      const browser = await firefox.launchPersistentContext(profilePath, {  
+        headless: false,  
+        userAgent: acc.user_agent,  
+        locale: "en-US",  
+        timezoneId: "America/New_York",  
+        viewport: null  
+      });  
 
-    if (!fs.existsSync(sessionFile)) {
-      console.log(`[JOB ${jobId}] No session, running login.js`);
-      execSync(`node login.js ${acc.username}`, { stdio: "inherit" });
+      let page = browser.pages()[0];  
+      if (!page) page = await browser.newPage();  
 
-      if (!fs.existsSync(sessionFile)) {
-        console.log(`[JOB ${jobId}] Login failed, aborting job`);
-        return;
-      }
-    }
+      try {  
+        const cookies = JSON.parse(fs.readFileSync(sessionFile, "utf8"));  
+        await browser.addCookies(  
+          cookies.map(c => {  
+            delete c.sameParty;  
+            delete c.priority;  
+            delete c.sourceScheme;  
+            delete c.sourcePort;  
+            delete c.partitionKey;  
+            return c;  
+          })  
+        );  
+      } catch {}  
 
-    const profilePath = path.join(__dirname, "browser_profile", acc.username);
-    if (!fs.existsSync(profilePath)) fs.mkdirSync(profilePath, { recursive: true });
+      const targetURL = "https://www.neobux.com/c/";  
+      await page.goto(targetURL, { waitUntil: "domcontentloaded", timeout: 30000 });  
 
-    const browser = await firefox.launchPersistentContext(profilePath, {
-      headless: false,
-      userAgent: acc.user_agent,
-      locale: "en-US",
-      timezoneId: "America/New_York",
-      viewport: null
-    });
+      // =========================  
+      // BALANCE  
+      // =========================  
+      try {  
+        await page.waitForSelector("#t_saldo span", { timeout: 15000 });  
+        const balance = await page.evaluate(() => {  
+          const el = document.querySelector("#t_saldo span");  
+          return el ? el.textContent.trim() : null;  
+        });  
+        if (balance) {  
+          const balanceFile = path.join(accountsDir, "balance.json");  
+          let data = {};  
+          if (fs.existsSync(balanceFile)) {  
+            try { data = JSON.parse(fs.readFileSync(balanceFile, "utf8")); } catch {}  
+          }  
+          data[acc.username] = balance;  
+          fs.writeFileSync(balanceFile, JSON.stringify(data, null, 2));  
+        }  
+      } catch {}  
 
-    let page = browser.pages()[0];
-    if (!page) page = await browser.newPage();
+      // =========================  
+      // RUN GAME  
+      // =========================  
+      await gaming(page);  
 
-    try {
-      const cookies = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
-      await browser.addCookies(
-        cookies.map(c => {
-          delete c.sameParty;
-          delete c.priority;
-          delete c.sourceScheme;
-          delete c.sourcePort;
-          delete c.partitionKey;
-          return c;
-        })
-      );
-    } catch {}
+      // =========================  
+      // SAVE COOKIES  
+      // =========================  
+      try {  
+        const cookies = await browser.cookies();  
+        fs.writeFileSync(  
+          sessionFile,  
+          JSON.stringify(  
+            cookies.map(c => {  
+              delete c.sameParty;  
+              delete c.priority;  
+              delete c.sourceScheme;  
+              delete c.sourcePort;  
+              delete c.partitionKey;  
+              return c;  
+            }),  
+            null,  
+            2  
+          )  
+        );  
+      } catch {}  
 
-    const targetURL = "https://www.neobux.com/c/";
-    await page.goto(targetURL, { waitUntil: "domcontentloaded", timeout: 30000 });
+      await new Promise(r => setTimeout(r, 2000));  
+      await browser.close();  
 
-    if (!page.url().startsWith(targetURL)) {
-      console.log(`[JOB ${jobId}] Session invalid, relogging`);
-      execSync(`node login.js ${acc.username}`, { stdio: "inherit" });
+      console.log(`[JOB ${jobId}] Completed successfully`);  
+      break;  
+    } catch (err) {  
+      console.log(`[JOB ${jobId}] Failed: ${err.message}`);  
+      break;  
+    }  
+  }  
+}  
+  
+// =========================  
+// PARALLEL LAUNCHER  
+// =========================  
+(async () => {  
+  if (!fs.existsSync(runningAccountsFile) || JSON.parse(fs.readFileSync(runningAccountsFile, "utf8")).length === 0) {  
+    resetRunningAccounts();  
+  }  
 
-      const cookies = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
-      await browser.addCookies(
-        cookies.map(c => {
-          delete c.sameParty;
-          delete c.priority;
-          delete c.sourceScheme;
-          delete c.sourcePort;
-          delete c.partitionKey;
-          return c;
-        })
-      );
+  const jobs = [];  
+  for (let i = 0; i < PARALLEL_JOBS; i++) {  
+    jobs.push(runJob(i + 1));  
+    await new Promise(r => setTimeout(r, LAUNCH_DELAY_MS));  
+  }  
 
-      await page.goto(targetURL, { waitUntil: "domcontentloaded", timeout: 30000 });
-    }
-
-    // =========================
-    // BALANCE
-    // =========================
-    try {
-      await page.waitForSelector("#t_saldo span", { timeout: 15000 });
-
-      const balance = await page.evaluate(() => {
-        const el = document.querySelector("#t_saldo span");
-        return el ? el.textContent.trim() : null;
-      });
-
-      if (balance) {
-        const balanceFile = path.join(accountsDir, "balance.json");
-        let data = {};
-
-        if (fs.existsSync(balanceFile)) {
-          try {
-            data = JSON.parse(fs.readFileSync(balanceFile, "utf8"));
-          } catch {}
-        }
-
-        data[acc.username] = balance;
-        fs.writeFileSync(balanceFile, JSON.stringify(data, null, 2));
-      }
-    } catch {}
-
-    // =========================
-    // RUN GAME
-    // =========================
-    await gaming(page);
-
-    // =========================
-    // SAVE COOKIES
-    // =========================
-    try {
-      const cookies = await browser.cookies();
-      fs.writeFileSync(
-        sessionFile,
-        JSON.stringify(
-          cookies.map(c => {
-            delete c.sameParty;
-            delete c.priority;
-            delete c.sourceScheme;
-            delete c.sourcePort;
-            delete c.partitionKey;
-            return c;
-          }),
-          null,
-          2
-        )
-      );
-    } catch {}
-
-    await new Promise(r => setTimeout(r, 2000));
-    await browser.close();
-
-    console.log(`[JOB ${jobId}] Completed successfully`);
-  } catch (err) {
-    console.log(`[JOB ${jobId}] Failed: ${err.message}`);
-  }
-}
-
-// =========================
-// PARALLEL LAUNCHER
-// =========================
-(async () => {
-  resetRunningAccounts();
-
-  const jobs = [];
-
-  for (let i = 0; i < PARALLEL_JOBS; i++) {
-    jobs.push(runJob(i + 1));
-    await new Promise(r => setTimeout(r, LAUNCH_DELAY_MS));
-  }
-
-  await Promise.allSettled(jobs);
-  console.log("All jobs finished.");
+  await Promise.allSettled(jobs);  
+  console.log("All jobs finished.");  
 })();
