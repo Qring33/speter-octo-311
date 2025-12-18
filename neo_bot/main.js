@@ -191,20 +191,35 @@ async function hasCaptchaError(page) {
   await page.check('input#tosagree');
   await page.check('input#ppagree');
 
-  // First step
-  await solveCaptchaRobust(page, username, email, password, birthYear);
-  await page.click('a.button.medium.green#botao_registo');
-
+  // First step: use green button (original script had .green here)
   let step1Ok = false;
-  for (let a = 1; a <= 5; a++) {
+  for (let a = 1; a <= 3; a++) {
+    console.log(`Attempting first registration click (attempt ${a}/3)`);
+    await solveCaptchaRobust(page, username, email, password, birthYear);
+
+    try {
+      await page.click('a.button.medium.green#botao_registo', { timeout: 30000 });
+    } catch (timeoutErr) {
+      console.log("First click timed out - refreshing page and retrying...");
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await page.fill('input#nomedeutilizador', username);
+      await page.fill('input[name="palavrapasse"]', password);
+      await page.fill('input#palavrapasseconfirmacao', password);
+      await page.fill('input#emailprincipal', email);
+      await page.fill('input#anonascimento', birthYear);
+      await page.check('input#tosagree');
+      await page.check('input#ppagree');
+      continue;
+    }
+
     try {
       await page.waitForSelector('input#val_em_1[name="val_em_1"]', { state: "visible", timeout: 12000 });
       step1Ok = true;
       break;
     } catch {
       if (await hasCaptchaError(page)) {
-        console.log("Wrong CAPTCHA (step 1) refreshing & retrying");
-        await page.reload({ waitUntil: "domcontentloaded" });
+        console.log("Wrong CAPTCHA after first click - refreshing & retrying");
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
         await page.fill('input#nomedeutilizador', username);
         await page.fill('input[name="palavrapasse"]', password);
         await page.fill('input#palavrapasseconfirmacao', password);
@@ -212,12 +227,20 @@ async function hasCaptchaError(page) {
         await page.fill('input#anonascimento', birthYear);
         await page.check('input#tosagree');
         await page.check('input#ppagree');
-        await solveCaptchaRobust(page, username, email, password, birthYear);
-        await page.click('a.button.medium.green#botao_registo');
+      } else {
+        console.log("Unknown failure after first click - refreshing & retrying");
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.fill('input#nomedeutilizador', username);
+        await page.fill('input[name="palavrapasse"]', password);
+        await page.fill('input#palavrapasseconfirmacao', password);
+        await page.fill('input#emailprincipal', email);
+        await page.fill('input#anonascimento', birthYear);
+        await page.check('input#tosagree');
+        await page.check('input#ppagree');
       }
     }
   }
-  if (!step1Ok) throw new Error("Failed step 1");
+  if (!step1Ok) throw new Error("Failed step 1 after 3 attempts");
 
   const otp = getOTP(email);
   await page.fill('input#val_em_1[name="val_em_1"]', otp);
@@ -228,10 +251,33 @@ async function hasCaptchaError(page) {
     await solveCaptchaRobust(page, username, email, password, birthYear);
   } catch {}
 
-  // Final registration
+  // Final registration: use blue button on OTP/final page, with robust retry
   let success = false;
   for (let a = 1; a <= 5; a++) {
-    await page.click('a.button.medium.blue#botao_registo');
+    console.log(`Attempting final registration click (attempt ${a}/5)`);
+
+    // Try blue first (as per error), fallback to green if not found
+    let buttonSelector = 'a.button.medium.blue#botao_registo';
+    try {
+      await page.waitForSelector(buttonSelector, { timeout: 5000 });
+    } catch {
+      console.log("Blue button not found, trying green button...");
+      buttonSelector = 'a.button.medium.green#botao_registo';
+    }
+
+    try {
+      await page.click(buttonSelector, { timeout: 30000 });
+    } catch (timeoutErr) {
+      console.log("Final click timed out - refreshing page and retrying...");
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await page.fill('input#val_em_1[name="val_em_1"]', otp);
+      try {
+        await page.waitForSelector('td[align="right"] > img[width="91"][height="24"]', { timeout: 8000 });
+        await solveCaptchaRobust(page, username, email, password, birthYear);
+      } catch {}
+      continue;
+    }
+
     try {
       await page.waitForURL("https://www.neobux.com/m/r1/", { timeout: 12000 });
       success = true;
@@ -239,10 +285,18 @@ async function hasCaptchaError(page) {
       break;
     } catch {
       if (await hasCaptchaError(page)) {
-        console.log("Final step failed refresh + re-enter OTP + new CAPTCHA");
-        await page.reload({ waitUntil: "domcontentloaded" });
+        console.log("Final step failed due to CAPTCHA error - refreshing + re-enter OTP + new CAPTCHA");
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
         await page.fill('input#val_em_1[name="val_em_1"]', otp);
         await solveCaptchaRobust(page, username, email, password, birthYear);
+      } else {
+        console.log("Final step failed (unknown reason) - refreshing + re-enter OTP");
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.fill('input#val_em_1[name="val_em_1"]', otp);
+        try {
+          await page.waitForSelector('td[align="right"] > img[width="91"][height="24"]', { timeout: 8000 });
+          await solveCaptchaRobust(page, username, email, password, birthYear);
+        } catch {}
       }
     }
   }
