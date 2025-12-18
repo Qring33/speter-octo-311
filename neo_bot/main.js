@@ -8,17 +8,27 @@ const accountsDir = path.join(__dirname, "neobux_accounts");
 if (!fs.existsSync(accountsDir)) fs.mkdirSync(accountsDir);
 const accountsFile = path.join(accountsDir, "neobux_accounts.json");
 
-// Load already used User-Agents
-function getUsedUAs() {
+// Load existing accounts to check used emails and User-Agents
+function loadExistingAccounts() {
   if (!fs.existsSync(accountsFile)) return [];
   try {
     const data = JSON.parse(fs.readFileSync(accountsFile, "utf8"));
-    return Array.isArray(data) ? data.map(a => a.user_agent).filter(Boolean) : [];
-  } catch { return []; }
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.error("Error reading accounts file:", e.message);
+    return [];
+  }
 }
-const usedUAs = getUsedUAs();
 
-// Load valid + unused User-Agents (keep original string with prefix like "Chrome: ")
+const existingAccounts = loadExistingAccounts();
+
+// Get used User-Agents
+const usedUAs = existingAccounts.map(a => a.user_agent).filter(Boolean);
+
+// Get used emails (to avoid reusing the same email)
+const usedEmails = existingAccounts.map(a => a.email.toLowerCase()).filter(Boolean);
+
+// Load valid + unused User-Agents
 const allUAs = fs.readFileSync("user_agents.txt", "utf8")
   .split("\n")
   .map(l => l.trim())
@@ -35,14 +45,34 @@ if (validUAs.length === 0) throw new Error("No unused valid User-Agent left!");
 
 const selectedUA = validUAs[Math.floor(Math.random() * validUAs.length)];
 
-let email, password;
-try {
-  const out = execSync("python3 gmail_generator.py new", { encoding: "utf8" }).trim();
-  const m = out.match(/([^\s]+@wixnation\.com)\s+([A-Za-z0-9]+)/);
-  if (!m) throw new Error("Could not parse email/password");
-  email = m[1].toLowerCase();
-  password = m[2];
-} catch (e) { throw new Error("gmail_generator.py failed: " + e.message); }
+// Load emails from email.txt
+const allEmails = fs.readFileSync("email.txt", "utf8")
+  .split("\n")
+  .map(l => l.trim().toLowerCase())
+  .filter(Boolean);
+
+if (allEmails.length === 0) throw new Error("No emails found in email.txt!");
+
+// Filter out already used emails
+const availableEmails = allEmails.filter(email => !usedEmails.includes(email));
+
+if (availableEmails.length === 0) {
+  throw new Error("No unused emails left in email.txt! All emails have already been registered.");
+}
+
+// Randomly select one unused email
+const email = availableEmails[Math.floor(Math.random() * availableEmails.length)];
+
+// Generate random password (10 characters: letters + numbers)
+function generatePassword(length = 10) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let pass = "";
+  for (let i = 0; i < length; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return pass;
+}
+const password = generatePassword();
 
 console.log("Selected UA :", selectedUA);
 console.log("Email       :", email);
@@ -59,7 +89,7 @@ function getUsername() {
 }
 function getBirthYear() { return String(1990 + Math.floor(Math.random() * 19)); }
 
-// Robust CAPTCHA solver — retries with page refresh if solver returns bad result
+// Robust CAPTCHA solver
 async function solveCaptchaRobust(page, username, email, password, birthYear) {
   for (let i = 1; i <= 3; i++) {
     console.log(`Solving CAPTCHA (attempt ${i}/3)...`);
@@ -86,7 +116,7 @@ async function solveCaptchaRobust(page, username, email, password, birthYear) {
       return solved;
     }
 
-    console.log(`Bad CAPTCHA result: "\( {solved}" refreshing page (retry \){i + 1})`);
+    console.log(`Bad CAPTCHA result: "${solved}" refreshing page (retry ${i + 1})`);
     await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
 
     // Re-fill everything after refresh
@@ -102,18 +132,23 @@ async function solveCaptchaRobust(page, username, email, password, birthYear) {
 }
 
 function getOTP(email) {
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 20; i++) {
     try {
-      const out = execSync(`python3 gmail_generator.py inbox ${email}`, { encoding: "utf8" }).trim();
-      const m = out.match(/\b[A-Z0-9]{12}\b/);
+      console.log(`Fetching OTP (attempt ${i + 1}/20)...`);
+      const output = execSync(`node outlook.js "${email}"`, { encoding: "utf8" });
+      console.log(output);
+
+      const m = output.match(/OTP::\s*([A-Z0-9]{12})/i);
       if (m) {
-        console.log("OTP received:", m[0]);
-        return m[0];
+        console.log("OTP received:", m[1]);
+        return m[1];
       }
-    } catch { }
-    execSync("sleep 6");
+    } catch (e) {
+      console.log("Error running outlook.js:", e.message);
+    }
+    execSync("sleep 10");
   }
-  throw new Error("No OTP received");
+  throw new Error("No OTP received after multiple attempts");
 }
 
 async function hasCaptchaError(page) {
@@ -183,7 +218,7 @@ async function hasCaptchaError(page) {
   const otp = getOTP(email);
   await page.fill('input#val_em_1[name="val_em_1"]', otp);
 
-  // Optional final CAPTCHA (if present)
+  // Optional final CAPTCHA
   try {
     await page.waitForSelector('td[align="right"] > img[width="91"][height="24"]', { timeout: 8000 });
     await solveCaptchaRobust(page, username, email, password, birthYear);
@@ -209,14 +244,12 @@ async function hasCaptchaError(page) {
   }
   if (!success) throw new Error("Registration failed");
 
-  // Save account with UA
+  // Save new account (append safely)
   const newAcc = { user_agent: selectedUA, username, email, password };
-  let list = fs.existsSync(accountsFile) ? JSON.parse(fs.readFileSync(accountsFile, "utf8")) : [];
-  if (!Array.isArray(list)) list = [];
-  list.push(newAcc);
-  fs.writeFileSync(accountsFile, JSON.stringify(list, null, 2));
+  const updatedList = [...existingAccounts, newAcc];
+  fs.writeFileSync(accountsFile, JSON.stringify(updatedList, null, 2));
 
-  console.log("\nACCOUNT SAVED accounts/neobux_accounts.json");
+  console.log("\nACCOUNT SAVED to neobux_accounts/neobux_accounts.json");
   console.log(`UA      : ${selectedUA}`);
   console.log(`Username: ${username}`);
   console.log(`Email   : ${email}`);
