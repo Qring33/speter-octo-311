@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ========================= CONFIGURATION =========================
-const RUNS_OF_MAIN = 2;                    // How many times to run main.js
+const RUNS_OF_MAIN = 1;                    // How many times to run main.js
 const DELAY_BETWEEN_RUNS = 2000;           // ms
 const TIMEOUT_PER_SCRIPT = 10 * 60 * 1000; // 10 minutes
 // =================================================================
