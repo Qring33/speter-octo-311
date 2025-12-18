@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ========================= CONFIGURATION =========================
-const RUNS_OF_MAIN = 1;                    // How many times to run main.js
+const RUNS_OF_MAIN = 2;                    // How many times to run main.js
 const DELAY_BETWEEN_RUNS = 2000;           // ms
 const TIMEOUT_PER_SCRIPT = 10 * 60 * 1000; // 10 minutes
 // =================================================================
@@ -57,12 +57,12 @@ function checkAccountsAndDecide() {
       const count = accounts.length;
       console.log(`Found ${count} account(s) in neobux_accounts.json`);
 
-      if (count === 96) {
-        console.log("\n96 accounts detected! Skipping main.js and upload.js.");
+      if (count === 33) {
+        console.log("\n33 accounts detected! Skipping main.js and upload.js.");
         console.log("Running tel_sender.py now...\n");
         runTelSender();
       } else {
-        console.log(`Only ${count}/96 accounts → Running normal flow: main.js → upload.js\n`);
+        console.log(`Only ${count}/33 accounts → Running normal flow: main.js → upload.js\n`);
         startMainSequence();
       }
 
@@ -85,13 +85,28 @@ function startMainSequence() {
   currentRun++;
   console.log(`Running main.js [\( {currentRun}/ \){RUNS_OF_MAIN}]...`);
 
+  // === NEW: Delete browser_profile folder before each main.js run ===
+  const profilePath = path.join(__dirname, 'browser_profile');
+  try {
+    if (fs.existsSync(profilePath)) {
+      fs.rmSync(profilePath, { recursive: true, force: true });
+      console.log(`Deleted existing 'browser_profile' folder before run ${currentRun}.\n`);
+    } else {
+      console.log(`No existing 'browser_profile' folder found before run ${currentRun}.\n`);
+    }
+  } catch (rmErr) {
+    console.error(`Failed to delete 'browser_profile' folder: ${rmErr.message}`);
+    // Continue anyway – we don't want to block the automation for this
+  }
+  // ===================================================================
+
   const main = exec("node main.js", { timeout: TIMEOUT_PER_SCRIPT });
 
   main.stdout.on("data", (d) => process.stdout.write(d));
   main.stderr.on("data", (d) => process.stderr.write(d));
 
   main.on("close", (code) => {
-    console.log(`main.js run \( {currentRun} finished (code: \){code})\n`);
+    console.log(`main.js run ${currentRun} finished (code: ${code})\n`);
     setTimeout(startMainSequence, DELAY_BETWEEN_RUNS);
   });
 
@@ -121,7 +136,7 @@ function runUpload() {
   });
 }
 
-// Special path: 96 accounts → run tel_sender.py
+// Special path: 33 accounts → run tel_sender.py
 function runTelSender() {
   console.log("Executing tel_sender.py...\n");
 
@@ -132,7 +147,7 @@ function runTelSender() {
 
   tel.on("close", (code) => {
     console.log(`\ntel_sender.py finished with exit code ${code}`);
-    console.log("\nSpecial 96-account sequence completed!\n");
+    console.log("\nSpecial 33-account sequence completed!\n");
   });
 
   tel.on("error", (err) => {

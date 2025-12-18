@@ -2,7 +2,7 @@ const https = require('https');
 const fs = require('fs');
 
 // Correct JSON URLs
-const neobuxJsonUrl = "https://www.dropbox.com/scl/fi/xmhua6xlyfjmdn1mpjrqg/neobux_accounts.json?rlkey=ozmcf5ar5iairxhp28iusccq7&st=1cxoegr3&dl=1";
+const neobuxJsonUrl = "https://www.dropbox.com/scl/fi/rg0xl60r1gtkvqr486out/neobux_accounts.json?rlkey=b6dvz6ecktq6t2g15qkty1u93&st=ggdil92u&dl=1";
 const imageSolverUrl = "https://www.dropbox.com/scl/fi/8b2p7oc8fz8sa4rzt9s20/image_solver.json?rlkey=t3sz5hfc5aj17uu58w4ym3c9u&dl=1";
 
 // File destinations
