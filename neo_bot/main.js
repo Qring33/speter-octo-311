@@ -132,23 +132,27 @@ async function solveCaptchaRobust(page, username, email, password, birthYear) {
 }
 
 function getOTP(email) {
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 3; i++) {
     try {
-      console.log(`Fetching OTP (attempt ${i + 1}/20)...`);
+      console.log(`Fetching OTP (major attempt ${i + 1}/3) - launching outlook.js...`);
       const output = execSync(`node outlook.js "${email}"`, { encoding: "utf8" });
-      console.log(output);
+      console.log("outlook.js output:\n" + output);
 
-      const m = output.match(/OTP::\s*([A-Z0-9]{12})/i);
-      if (m) {
-        console.log("OTP received:", m[1]);
-        return m[1];
+      const m = output.match(/3\/5 - OTP::\s*([A-Z0-9]{12})/i);
+      if (m && m[1]) {
+        console.log("OTP successfully received:", m[1]);
+        return m[1].trim();
+      } else {
+        console.log("No OTP found in outlook.js output. Retrying with new outlook.js instance...");
       }
     } catch (e) {
-      console.log("Error running outlook.js:", e.message);
+      console.log("outlook.js failed or crashed:", e.message);
     }
-    execSync("sleep 10");
+    // Wait before retrying a full new outlook.js run
+    console.log("Waiting 15 seconds before next outlook.js attempt...");
+    execSync("sleep 15");
   }
-  throw new Error("No OTP received after multiple attempts");
+  throw new Error("Failed to receive OTP after 3 full attempts with outlook.js");
 }
 
 async function hasCaptchaError(page) {

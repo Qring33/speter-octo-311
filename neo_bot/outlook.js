@@ -58,7 +58,7 @@ if (process.argv.length >= 3) {
 
   if (!foundPasswordDirectly) {
     const usePasswordLink = page.locator('span[role="button"]:has-text("Use your password")');
-    await usePasswordLink.waitFor({ state: "visible", timeout: 30000 });
+    await usePasswordLink.waitFor({ state: ".visible", timeout: 30000 });
     await usePasswordLink.click();
     await passwordLocator.waitFor({ state: "visible", timeout: 30000 });
   }
@@ -77,20 +77,19 @@ if (process.argv.length >= 3) {
 
   let otpCode = null;
   const maxRetries = 3;
+  let emailClicked = false; // Track if we already clicked the email
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      //console.log(`   Attempt ${attempt}/3 - Checking inbox...`);
-
       const messageList = page.locator('div[tabindex="-1"][role="listbox"]');
       await messageList.waitFor({ state: "visible", timeout: 30000 });
 
-      // Refresh inbox quietly on each retry to catch new emails
-      await page.reload({ waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(3000);
+      let neoBuxEmailRow = null;
+      let rowFound = false;
 
-      let neoBuxEmailRow = page.locator('div[role="option"]:has(div span.OZZZK:has-text("NeoBux<noreply@mail.neobux.com>"))').first();
-      let rowFound = await neoBuxEmailRow.isVisible({ timeout: 10000 }).catch(() => false);
+      // Try different selectors to find the email row
+      neoBuxEmailRow = page.locator('div[role="option"]:has(div span.OZZZK:has-text("NeoBux<noreply@mail.neobux.com>"))').first();
+      rowFound = await neoBuxEmailRow.isVisible({ timeout: 10000 }).catch(() => false);
 
       if (!rowFound) {
         neoBuxEmailRow = page.locator('div[role="option"][aria-label*="New registration: Email verification"]').first();
@@ -98,31 +97,39 @@ if (process.argv.length >= 3) {
       }
 
       if (!rowFound) {
-        neoBuxEmailRow = page.locator('xpath=/html/body/div[1]/div/div[2]/div/div[2]/div[2]/div/div[1]/div[1]/div/div/div[3]/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div/div[2]/div/div').first();
+        neoBuxEmailRow = page.locator('xpath=/html/body/div[1]/div/div[2]/div/div[2]/div/div[1]/div[1]/div/div/div[3]/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div/div[2]/div/div').first();
         rowFound = await neoBuxEmailRow.isVisible({ timeout: 10000 }).catch(() => false);
       }
 
-      if (!rowFound) {
-        if (attempt === maxRetries) {
-          console.error("Error: NeoBux verification email not found after 3 attempts.");
-          await browserContext.close();
-          process.exit(1);
-        }
-        console.log("   Email not found yet, retrying in 15 seconds...");
-        await page.waitForTimeout(15000);
-        continue;
+      // If email row is found and we haven't clicked it yet
+      if (rowFound && !emailClicked) {
+        await neoBuxEmailRow.scrollIntoViewIfNeeded();
+        await neoBuxEmailRow.click({ force: true });
+        emailClicked = true;
+        await page.waitForTimeout(8000); // Initial wait after clicking
       }
 
-      await neoBuxEmailRow.scrollIntoViewIfNeeded();
-      await neoBuxEmailRow.click({ force: true });
-      await page.waitForTimeout(6000);
+      // Only try to extract OTP if we have clicked the email
+      if (emailClicked) {
+        const otpDiv = page.locator('div[style*="Lucida Console"][style*="width: 300px"][style*="white-space: nowrap"]');
+        const otpVisible = await otpDiv.waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
 
-      const otpDiv = page.locator('div[style*="Lucida Console"][style*="width: 300px"][style*="white-space: nowrap"]');
-      await otpDiv.waitFor({ state: "visible", timeout: 20000 });
+        if (otpVisible) {
+          otpCode = await otpDiv.innerText();
+          console.log(`3/5 - OTP:: ${otpCode.trim()}`);
+          break; // Success → exit loop
+        }
+      }
 
-      otpCode = await otpDiv.innerText();
-      console.log(`3/5 - OTP:: ${otpCode.trim()}`);
-      break; // Success → exit retry loop
+      // If we reach here, either email not found or OTP not loaded yet
+      if (attempt === maxRetries) {
+        console.error("Error: NeoBux verification email not found after 3 attempts.");
+        await browserContext.close();
+        process.exit(1);
+      }
+
+      console.log("   Email not found yet, retrying in 15 seconds...");
+      await page.waitForTimeout(15000);
 
     } catch (err) {
       if (attempt === maxRetries) {
