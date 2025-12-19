@@ -58,7 +58,7 @@ if (process.argv.length >= 3) {
 
   if (!foundPasswordDirectly) {
     const usePasswordLink = page.locator('span[role="button"]:has-text("Use your password")');
-    await usePasswordLink.waitFor({ state: ".visible", timeout: 30000 });
+    await usePasswordLink.waitFor({ state: "visible", timeout: 30000 });
     await usePasswordLink.click();
     await passwordLocator.waitFor({ state: "visible", timeout: 30000 });
   }
