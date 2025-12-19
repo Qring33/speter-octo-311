@@ -249,10 +249,22 @@ async function hasCaptchaError(page) {
     await solveCaptchaRobust(page, username, email, password, birthYear);
   } catch {}
 
-  // Final registration
+  // Final registration - FIXED SELECTOR
   let success = false;
   for (let a = 1; a <= 5; a++) {
-    await page.click('a.button.medium.blue#botao_registo');
+    try {
+      // Primary selector (updated based on provided HTML)
+      await page.click('a.button.medium.blue#botao_registo', { timeout: 30000 });
+    } catch (e1) {
+      try {
+        // Fallback XPath if the CSS selector fails
+        await page.click('//a[@class="button medium blue" and @id="botao_registo"]', { timeout: 30000 });
+      } catch (e2) {
+        // Final fallback using the exact XPath you provided
+        await page.click('/html/body/div[2]/div/table/tbody/tr/td[1]/table/tbody/tr/td/form/table/tbody/tr[4]/td/div[2]/a/span', { timeout: 30000 });
+      }
+    }
+
     try {
       await page.waitForURL("https://www.neobux.com/m/r1/", { timeout: 12000 });
       success = true;
