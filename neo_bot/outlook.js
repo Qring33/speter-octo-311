@@ -35,7 +35,7 @@ if (process.argv.length >= 3) {
   console.log(`1/5 - Starting login for ${targetEmail}`);
 
   const browserContext = await firefox.launchPersistentContext("./browser_profile", {
-    headless: true,
+    headless: false,
     locale: "en-US",
     userAgent: selectedUA,
     timezoneId: "America/New_York",
@@ -105,7 +105,7 @@ if (process.argv.length >= 3) {
       if (rowFound && !emailClicked) {
         await neoBuxEmailRow.scrollIntoViewIfNeeded();
 
-        // Log exactly when the row is clicked, including which selector matched
+        // Log which selector is being used when clicking
         if (await page.locator('div[role="option"]:has(div span.OZZZK:has-text("NeoBux<noreply@mail.neobux.com>"))').first().isVisible({ timeout: 1000 }).catch(() => false)) {
           console.log("   Clicking NeoBux email row using sender selector");
         }
@@ -119,6 +119,11 @@ if (process.argv.length >= 3) {
         await neoBuxEmailRow.click({ force: true });
         emailClicked = true;
         await page.waitForTimeout(8000); // Initial wait after clicking
+      }
+
+      if (!rowFound && !emailClicked) {
+        console.log("   NeoBux verification email not found with any selector on this attempt");
+        console.log("   Skipping OTP check because email row was not clicked");
       }
 
       // Only try to extract OTP if we have clicked the email
