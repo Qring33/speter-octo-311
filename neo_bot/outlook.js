@@ -35,7 +35,7 @@ if (process.argv.length >= 3) {
   console.log(`1/5 - Starting login for ${targetEmail}`);
 
   const browserContext = await firefox.launchPersistentContext("./browser_profile", {
-    headless: false,
+    headless: true,
     locale: "en-US",
     userAgent: selectedUA,
     timezoneId: "America/New_York",
@@ -104,6 +104,18 @@ if (process.argv.length >= 3) {
       // If email row is found and we haven't clicked it yet
       if (rowFound && !emailClicked) {
         await neoBuxEmailRow.scrollIntoViewIfNeeded();
+
+        // Log exactly when the row is clicked, including which selector matched
+        if (await page.locator('div[role="option"]:has(div span.OZZZK:has-text("NeoBux<noreply@mail.neobux.com>"))').first().isVisible({ timeout: 1000 }).catch(() => false)) {
+          console.log("   Clicking NeoBux email row using sender selector");
+        }
+        if (await page.locator('div[role="option"][aria-label*="New registration: Email verification"]').first().isVisible({ timeout: 1000 }).catch(() => false)) {
+          console.log("   Clicking NeoBux email row using subject selector");
+        }
+        if (await page.locator('xpath=/html/body/div[1]/div/div[2]/div/div[2]/div/div[1]/div[1]/div/div/div[3]/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div/div[2]/div/div').first().isVisible({ timeout: 1000 }).catch(() => false)) {
+          console.log("   Clicking NeoBux email row using absolute XPath");
+        }
+
         await neoBuxEmailRow.click({ force: true });
         emailClicked = true;
         await page.waitForTimeout(8000); // Initial wait after clicking
