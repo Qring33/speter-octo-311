@@ -131,10 +131,8 @@ module.exports = async function gaming(page) {
         continue;
       }
 
-      // -----------------------------
-      // Gameplay cycles (now supports proper restart after Play Again)
-      // -----------------------------
-      for (let inner = 1; inner <= 2 && loopCounter <= maxLoops; inner++) {
+      // Gameplay cycles — now 40 plays per tab/session
+for (let inner = 1; inner <= 20 && loopCounter <= maxLoops; inner++) {
         console.log(`--- Play Cycle ${loopCounter} ---`);
 
         console.log("Waiting 150s for game iframe...");
