@@ -132,7 +132,7 @@ module.exports = async function gaming(page) {
       }
 
       // -----------------------------
-      // Gameplay cycles
+      // Gameplay cycles (now supports proper restart after Play Again)
       // -----------------------------
       for (let inner = 1; inner <= 2 && loopCounter <= maxLoops; inner++) {
         console.log(`--- Play Cycle ${loopCounter} ---`);
@@ -219,23 +219,20 @@ module.exports = async function gaming(page) {
           let clickCount = 0;
           const maxClicks = 30;
 
-          // CRITICAL FIX: Click position1 TWICE with small delay to ensure game actually starts
-          console.log("Performing initial start clicks (position1 x2)...");
+          // Click position1 TWICE to reliably start the game
           for (let i = 0; i < 2; i++) {
             try {
               box = await gameIframe.boundingBox();
-              if (!box) throw new Error("Iframe bounding box lost");
+              if (!box) throw new Error();
               await frame.locator("body").click({ position: position1, force: true });
               clickCount++;
-              console.log(`Initial start click ${i + 1}/2 successful`);
-              await newPage.waitForTimeout(500); // Small delay between the two start clicks
+              await newPage.waitForTimeout(300);
             } catch (err) {
-              console.log(`Initial start click ${i + 1}/2 failed: ${err.message}`);
-              // Continue to next attempt — second click may still register
+              console.log(`Initial position1 click ${i + 1} failed: ${err.message}`);
             }
           }
 
-          // Now continue with the rest of the clicks
+          // Continue with the rest of the clicks (position2 and position3)
           while (clickCount < maxClicks) {
             box = await gameIframe.boundingBox();
             if (!box) break;
@@ -285,11 +282,11 @@ module.exports = async function gaming(page) {
 
           if (!playAgainSuccess) {
             console.log("Failed to click Play Again after multiple attempts. Forcing restart (new global loop).");
-            break; // Exit inner loop → full restart in next outer iteration
+            break; // Exit inner loop → will trigger full re-entry in next outer iteration
           }
 
           // -----------------------------
-          // Re-click the ad/play button after "Play Again"
+          // CRITICAL: Re-click the ad/play button after "Play Again"
           // -----------------------------
           console.log("Re-clicking ad/play button after Play Again...");
           const adPlayClickedAgain = await clickWithRetry(
@@ -301,14 +298,15 @@ module.exports = async function gaming(page) {
 
           if (!adPlayClickedAgain) {
             console.log("Failed to re-click ad/play button after Play Again. Forcing restart.");
-            break;
+            break; // Exit inner loop → full restart next cycle
           }
 
-          // Only increment on successful full play
+          // Only increment loopCounter on successful full play
           loopCounter++;
 
         } catch (err) {
           console.log("Game error during play cycle:", err.message);
+          // Do not increment loopCounter on error — retry full cycle
           break; // Force restart via outer loop
         }
       }

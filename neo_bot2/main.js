@@ -86,7 +86,7 @@ async function runJob() {
       console.log(`Session file found for ${acc.username}. Loading session...`);
 
       browser = await firefox.launchPersistentContext(profilePath, {
-        headless: true,
+        headless: false,
         userAgent: acc.user_agent,
         locale: "en-US",
         timezoneId: "America/New_York",
