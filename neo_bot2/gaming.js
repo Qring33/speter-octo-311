@@ -49,7 +49,7 @@ module.exports = async function gaming(page) {
     }
 
     // -----------------------------
-    // Robust reward page load with retry + refresh
+    // Robust reward page load with retry + refresh (up to 3 attempts)
     // -----------------------------
     let rewardPageSuccess = false;
     const maxRewardAttempts = 3;
@@ -63,20 +63,49 @@ module.exports = async function gaming(page) {
           timeout: 30000
         });
 
-        const rewardButton = "#rwtd";
-        await page.waitForSelector(rewardButton, { timeout: 15000 }); // Slightly longer initial wait
+        // Primary selector: the container td that holds "Play now"
+        let rewardButtonClicked = false;
 
-        const [newPage] = await Promise.all([
-          context.waitForEvent("page"),
-          page.click(rewardButton)
-        ]);
+        // First try: click the <td id="pntd"> (the actual clickable "Play now" cell)
+        try {
+          await page.waitForSelector('#pntd', { state: "visible", timeout: 10000 });
+          const [newPage] = await Promise.all([
+            context.waitForEvent("page"),
+            page.click('#pntd')
+          ]);
+          console.log("Successfully clicked #pntd (Play now cell)");
+          rewardButtonClicked = true;
 
-        console.log("Successfully clicked reward button, opening gameplay tab...");
+          await newPage.waitForLoadState("domcontentloaded", { timeout: 30000 });
+          await newPage.waitForTimeout(5000);
+        } catch (err) {
+          console.log("#pntd not found after 10s, trying fallback XPath...");
 
-        await newPage.waitForLoadState("domcontentloaded", { timeout: 30000 });
-        await newPage.waitForTimeout(5000);
+          // Fallback: use provided XPath pointing to the parent <a> that wraps the table
+          const fallbackXPath = '/html/body/div[2]/div/div[2]/div[2]/div[2]/a/table';
 
-        // If we get here → success!
+          await page.waitForSelector(`xpath=${fallbackXPath}`, { state: "visible", timeout: 10000 });
+
+          const [newPage] = await Promise.all([
+            context.waitForEvent("page"),
+            page.evaluate((xp) => {
+              const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+              if (el) el.click();
+            }, fallbackXPath)
+          ]);
+
+          console.log("Successfully clicked fallback XPath reward button");
+          rewardButtonClicked = true;
+
+          await newPage.waitForLoadState("domcontentloaded", { timeout: 30000 });
+          await newPage.waitForTimeout(5000);
+        }
+
+        if (!rewardButtonClicked) {
+          throw new Error("Neither #pntd nor fallback XPath worked");
+        }
+
+        // Success → proceed
         rewardPageSuccess = true;
 
         console.log("Opening Knife Smash...");
@@ -139,7 +168,7 @@ module.exports = async function gaming(page) {
           console.log("Failed to enter game after multiple attempts. Skipping this cycle.");
           await newPage.close();
           loopCounter++;
-          break; // Exit reward retry loop and go to next global cycle
+          break; // Exit reward retry loop
         }
 
         // -----------------------------
@@ -274,16 +303,16 @@ module.exports = async function gaming(page) {
               }
             }
 
-            loopCounter++; // Only increment after successful play
+            loopCounter++; // Increment only after successful play
 
           } catch (err) {
             console.log("Game error during play cycle:", err.message);
-            // Do not increment loopCounter on gameplay error — will retry entry next time
+            // Do not increment loopCounter on gameplay error
           }
         }
 
         await newPage.close();
-        break; // Success → exit the reward retry loop
+        break; // Success → exit reward retry loop
 
       } catch (err) {
         console.log(`Failed to click reward button on attempt ${rewardAttempt}:`, err.message);
@@ -291,15 +320,13 @@ module.exports = async function gaming(page) {
         if (rewardAttempt < maxRewardAttempts) {
           console.log("Refreshing rewards page and retrying...");
           await page.waitForTimeout(3000);
-          // Loop will continue and re-goto the URL
         } else {
           console.log("Failed to access reward button after 3 attempts. Moving to next global cycle.");
-          loopCounter++; // Skip this entire cycle
+          loopCounter++;
         }
       }
     }
 
-    // If reward page never succeeded, loopCounter already incremented inside
     if (!rewardPageSuccess && loopCounter > maxLoops) {
       break;
     }
