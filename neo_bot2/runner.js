@@ -5,7 +5,7 @@ const path = require('path');
 // ========================= CONFIGURATION =========================
 const RUNS_OF_MAIN = 1;                    // How many times to run main.js
 const DELAY_BETWEEN_RUNS = 2000;           // ms
-const TIMEOUT_PER_SCRIPT = 10 * 60 * 1000; // 10 minutes
+// TIMEOUT_PER_SCRIPT removed — no timeout anymore
 // =================================================================
 
 console.log("Starting automation sequence...\n");
@@ -14,7 +14,7 @@ console.log("Starting automation sequence...\n");
 function runDownloader() {
   console.log("Running downloader.js...\n");
 
-  const downloader = exec("node downloader.js", { timeout: TIMEOUT_PER_SCRIPT });
+  const downloader = exec("node downloader.js");
 
   downloader.stdout.on("data", (d) => process.stdout.write(d));
   downloader.stderr.on("data", (d) => process.stderr.write(d));
@@ -44,9 +44,9 @@ function startMainSequence() {
   }
 
   currentRun++;
-  console.log(`Running main.js [${currentRun}/${RUNS_OF_MAIN}]...`);
+  console.log(`Running main.js [\( {currentRun}/ \){RUNS_OF_MAIN}]...`);
 
-  const main = exec("node main.js", { timeout: TIMEOUT_PER_SCRIPT });
+  const main = exec("node main.js");
 
   main.stdout.on("data", (d) => process.stdout.write(d));
   main.stderr.on("data", (d) => process.stderr.write(d));
@@ -66,7 +66,7 @@ function runUpload() {
   console.log("All main.js runs completed.");
   console.log("Running upload.js once...\n");
 
-  const upload = exec("node upload.js", { timeout: TIMEOUT_PER_SCRIPT });
+  const upload = exec("node upload.js");
 
   upload.stdout.on("data", (d) => process.stdout.write(d));
   upload.stderr.on("data", (d) => process.stderr.write(d));
