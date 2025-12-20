@@ -80,14 +80,13 @@ module.exports = async function gaming(page) {
       // Robust game entry with refresh on failure
       // -----------------------------
       let gameEntrySuccess = false;
-      const maxGameEntryAttempts = 5; // Prevent infinite loop
+      const maxGameEntryAttempts = 5;
       let gameEntryAttempt = 0;
 
       while (!gameEntrySuccess && gameEntryAttempt < maxGameEntryAttempts && loopCounter <= maxLoops) {
         gameEntryAttempt++;
         console.log(`Game entry attempt \( {gameEntryAttempt}/ \){maxGameEntryAttempts}`);
 
-        // Helper to refresh and restart the play sequence
         const refreshAndRestart = async () => {
           console.log("Refreshing Knife Smash page and restarting play sequence...");
           await newPage.reload({ waitUntil: "domcontentloaded", timeout: 30000 });
@@ -100,12 +99,12 @@ module.exports = async function gaming(page) {
           'ark-div[ark-test-id="ark-play-now"]',
           3,
           "Play Now button",
-          refreshAndRestart // If fails after 3 tries → refresh
+          refreshAndRestart
         );
 
         if (!playNowClicked) {
           console.log("Failed to click Play Now even after refresh attempts. Trying again...");
-          continue; // Try full entry again
+          continue;
         }
 
         // Step 2: Click "ad/play button"
@@ -114,7 +113,7 @@ module.exports = async function gaming(page) {
           'button.ark-ad-button[data-type="play-button"]',
           3,
           "ad/play button",
-          refreshAndRestart // If fails → refresh and restart from Play Now
+          refreshAndRestart
         );
 
         if (!adPlayClicked) {
@@ -122,7 +121,6 @@ module.exports = async function gaming(page) {
           continue;
         }
 
-        // If we reached here, both buttons were clicked successfully
         gameEntrySuccess = true;
       }
 
@@ -134,7 +132,7 @@ module.exports = async function gaming(page) {
       }
 
       // -----------------------------
-      // Now proceed with the actual gameplay (only if entry succeeded)
+      // Gameplay cycles (now supports proper restart after Play Again)
       // -----------------------------
       for (let inner = 1; inner <= 2 && loopCounter <= maxLoops; inner++) {
         console.log(`--- Play Cycle ${loopCounter} ---`);
@@ -143,9 +141,7 @@ module.exports = async function gaming(page) {
         await newPage.waitForTimeout(150000);
 
         try {
-          // -----------------------------
           // CLOSE POPUP IF EXISTS
-          // -----------------------------
           const popup = await newPage.$('xpath=/html/body/ark-popup');
           if (popup) {
             const closeBtn = await newPage.$('xpath=/html/body/ark-popup/ark-div[1]/ark-span');
@@ -156,9 +152,7 @@ module.exports = async function gaming(page) {
             }
           }
 
-          // -----------------------------
           // DISABLE BLOCKING HTML LAYER (PERMANENT)
-          // -----------------------------
           await newPage.evaluate(() => {
             const outerXPath = '/html/body/div[1]/div/div/main/ark-main-block/ark-article/ark-grid/ark-grid[4]/ark-div/ark-div/ark-div[2]/ark-div[3]/ark-div[6]';
             const innerXPath = outerXPath + '/ark-div[2]/ark-div[2]';
@@ -184,9 +178,7 @@ module.exports = async function gaming(page) {
             });
           });
 
-          // -----------------------------
           // LOOK FOR GAME IFRAME
-          // -----------------------------
           const widgetSelector = 'ark-div.ark-widget-app';
           await newPage.waitForSelector(widgetSelector, { timeout: 60000 });
 
@@ -253,8 +245,14 @@ module.exports = async function gaming(page) {
             }
           }
 
-          while (true) {
-            console.log("Waiting 5s and checking for Play Again...");
+          // -----------------------------
+          // Wait for and click "Play Again" with retry logic
+          // -----------------------------
+          let playAgainSuccess = false;
+          const maxPlayAgainAttempts = 3;
+
+          for (let attempt = 1; attempt <= maxPlayAgainAttempts; attempt++) {
+            console.log(`Waiting 5s and checking for Play Again... (attempt \( {attempt}/ \){maxPlayAgainAttempts})`);
             await newPage.waitForTimeout(5000);
 
             const endContainer = await newPage.$('ark-div.ark-game-end-container');
@@ -265,18 +263,45 @@ module.exports = async function gaming(page) {
             );
 
             if (playAgainBtn) {
-              await playAgainBtn.click();
-              console.log("Clicked Play Again button.");
-              break;
+              try {
+                await playAgainBtn.click({ timeout: 10000 });
+                console.log("Clicked Play Again button.");
+                playAgainSuccess = true;
+                break;
+              } catch (clickErr) {
+                console.log("Click failed on Play Again button, retrying...");
+              }
             }
           }
 
-          // Only increment after successful play cycle
+          if (!playAgainSuccess) {
+            console.log("Failed to click Play Again after multiple attempts. Forcing restart (new global loop).");
+            break; // Exit inner loop → will trigger full re-entry in next outer iteration
+          }
+
+          // -----------------------------
+          // CRITICAL: Re-click the ad/play button after "Play Again"
+          // -----------------------------
+          console.log("Re-clicking ad/play button after Play Again...");
+          const adPlayClickedAgain = await clickWithRetry(
+            newPage,
+            'button.ark-ad-button[data-type="play-button"]',
+            3,
+            "ad/play button (post-restart)"
+          );
+
+          if (!adPlayClickedAgain) {
+            console.log("Failed to re-click ad/play button after Play Again. Forcing restart.");
+            break; // Exit inner loop → full restart next cycle
+          }
+
+          // Only increment loopCounter on successful full play
           loopCounter++;
 
         } catch (err) {
           console.log("Game error during play cycle:", err.message);
-          // Do NOT increment loopCounter here — retry entry next outer loop
+          // Do not increment loopCounter on error — retry full cycle
+          break; // Force restart via outer loop
         }
       }
 
@@ -284,7 +309,7 @@ module.exports = async function gaming(page) {
 
     } catch (err) {
       console.log("Failed during NeoBux cycle:", err.message);
-      loopCounter++; // Only increment on full cycle failure (e.g., reward tab issue)
+      loopCounter++;
     }
   }
 
