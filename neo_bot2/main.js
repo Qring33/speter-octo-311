@@ -40,9 +40,16 @@ function getAndConsumeAccount() {
   }
 
   if (!Array.isArray(accounts) || accounts.length === 0) {
-    console.log("No accounts available.");
+  console.log("No accounts available. Resetting from source...");
+  resetRunningAccounts();
+
+  accounts = JSON.parse(fs.readFileSync(runningAccountsFile, "utf8"));
+
+  if (!Array.isArray(accounts) || accounts.length === 0) {
+    console.log("Source accounts file is empty. Exiting.");
     process.exit(0);
   }
+}
 
   const index = Math.floor(Math.random() * accounts.length);
   const acc = accounts[index];
@@ -87,7 +94,7 @@ async function runSingleAccount() {
       console.log(`Session file found for ${acc.username}. Loading session...`);
 
       browser = await firefox.launchPersistentContext(profilePath, {
-        headless: true,
+        headless: false,
         userAgent: acc.user_agent,
         locale: "en-US",
         timezoneId: "America/New_York",
