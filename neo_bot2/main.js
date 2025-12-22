@@ -149,7 +149,7 @@ async function runSingleAccount() {
       await new Promise(r => setTimeout(r, 4000));
 
       browser = await firefox.launchPersistentContext(profilePath, {
-        headless: false,
+        headless: true,
         userAgent: acc.user_agent,
         locale: "en-US",
         timezoneId: "America/New_York",
