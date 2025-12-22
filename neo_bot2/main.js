@@ -153,7 +153,7 @@ async function runJob() {
 
       // Now re-launch our own browser and load the freshly saved cookies
       browser = await firefox.launchPersistentContext(profilePath, {
-        headless: false,
+        headless: true,
         userAgent: acc.user_agent,
         locale: "en-US",
         timezoneId: "America/New_York",
