@@ -13,13 +13,15 @@ async function clickWithRetry(page, selector, maxRetries = 3, name = "button", o
       }, selector);
       console.log(`Clicked ${name} (attempt ${attempt})`);
       return true;
-    } catch {
+    } catch (err) {
       if (attempt < maxRetries) {
         console.log(`${name} not found, retrying (${attempt}/${maxRetries})...`);
         await page.waitForTimeout(2000);
       } else {
         console.log(`${name} not found after ${maxRetries} attempts.`);
-        if (onFinalFailure) await onFinalFailure();
+        if (onFinalFailure) {
+          await onFinalFailure();
+        }
       }
     }
   }
@@ -32,22 +34,30 @@ async function clickWithRetry(page, selector, maxRetries = 3, name = "button", o
 module.exports = async function gaming(page) {
   const context = page.context();
   const maxLoops = 3;
+  const globalEvery = 5;
   let loopCounter = 1;
+  let globalLoop = 1;
 
   while (loopCounter <= maxLoops) {
-    console.log(`===== PLAY LOOP ${loopCounter} =====`);
 
+    if ((loopCounter - 1) % globalEvery === 0) {
+      console.log(`===== GLOBAL LOOP ${globalLoop} =====`);
+      globalLoop++;
+    }
+
+    console.log("Navigating to game rewards page...");
     await page.goto("https://www.neobux.com/m/ag/", {
       waitUntil: "domcontentloaded",
       timeout: 30000
     });
 
     try {
-      await page.waitForSelector("#rwtd", { timeout: 10000 });
+      const rewardButton = "#rwtd";
+      await page.waitForSelector(rewardButton, { timeout: 10000 });
 
       const [newPage] = await Promise.all([
         context.waitForEvent("page"),
-        page.click("#rwtd")
+        page.click(rewardButton)
       ]);
 
       await newPage.waitForLoadState("domcontentloaded", { timeout: 30000 });
@@ -58,83 +68,173 @@ module.exports = async function gaming(page) {
         timeout: 30000
       });
 
-      const refresh = async () => {
-        await newPage.reload({ waitUntil: "domcontentloaded" });
-        await newPage.waitForTimeout(3000);
-      };
+      let gameEntrySuccess = false;
+      const maxGameEntryAttempts = 5;
+      let gameEntryAttempt = 0;
 
-      if (!await clickWithRetry(newPage, 'ark-div[ark-test-id="ark-play-now"]', 3, "Play Now", refresh)) {
-        throw new Error("Play Now failed");
+      while (!gameEntrySuccess && gameEntryAttempt < maxGameEntryAttempts && loopCounter <= maxLoops) {
+        gameEntryAttempt++;
+
+        const refreshAndRestart = async () => {
+          await newPage.reload({ waitUntil: "domcontentloaded", timeout: 30000 });
+          await newPage.waitForTimeout(3000);
+        };
+
+        const playNowClicked = await clickWithRetry(
+          newPage,
+          'ark-div[ark-test-id="ark-play-now"]',
+          3,
+          "Play Now button",
+          refreshAndRestart
+        );
+
+        if (!playNowClicked) continue;
+
+        const adPlayClicked = await clickWithRetry(
+          newPage,
+          'button.ark-ad-button[data-type="play-button"]',
+          3,
+          "ad/play button",
+          refreshAndRestart
+        );
+
+        if (!adPlayClicked) continue;
+
+        gameEntrySuccess = true;
       }
 
-      if (!await clickWithRetry(newPage, 'button.ark-ad-button[data-type="play-button"]', 3, "Ad Play", refresh)) {
-        throw new Error("Ad Play failed");
+      if (!gameEntrySuccess) {
+        await newPage.close();
+        loopCounter++;
+        continue;
       }
 
       // -----------------------------
-      // WAIT FOR GAME IFRAME (REAL WAIT)
+      // Gameplay cycles
       // -----------------------------
-      console.log("Waiting for game iframe (up to 60s)...");
+      for (let inner = 1; inner <= 5 && loopCounter <= maxLoops; inner++) {
+        console.log(`--- Play Cycle ${loopCounter} ---`);
 
-      await newPage.waitForSelector("ark-div.ark-widget-app", { timeout: 120000 });
-
-      let gameIframe = null;
-      let frame = null;
-      const startWait = Date.now();
-
-      while (Date.now() - startWait < 120000) {
-        const widget = await newPage.$("ark-div.ark-widget-app");
-        if (widget) {
-          const frames = await widget.$$('iframe[ark-test-id="ark-game-iframe"]');
-
-          for (const f of frames) {
-            const src = await f.getAttribute("src");
-            if (src && src.includes("knife-smash")) {
-              gameIframe = f;
-              frame = await f.contentFrame();
-              break;
+        try {
+          // CLOSE POPUP IF EXISTS
+          const popup = await newPage.$('xpath=/html/body/ark-popup');
+          if (popup) {
+            const closeBtn = await newPage.$('xpath=/html/body/ark-popup/ark-div[1]/ark-span');
+            if (closeBtn) {
+              await closeBtn.click();
+              await newPage.waitForTimeout(1000);
             }
           }
-        }
 
-        if (frame) break;
-        await newPage.waitForTimeout(1000);
-      }
+          // DISABLE BLOCKING HTML LAYER
+          await newPage.evaluate(() => {
+            const outerXPath = '/html/body/div[1]/div/div/main/ark-main-block/ark-article/ark-grid/ark-grid[4]/ark-div/ark-div/ark-div[2]/ark-div[3]/ark-div[6]';
+            const innerXPath = outerXPath + '/ark-div[2]/ark-div[2]';
 
-      if (!frame) {
-        throw new Error("Game iframe not found after 60s");
-      }
+            const getByXPath = (xp) =>
+              document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
 
-      console.log("Game iframe detected and active.");
+            const hide = () => {
+              const el = getByXPath(innerXPath);
+              if (el) {
+                el.style.display = 'none';
+                el.style.visibility = 'hidden';
+                el.style.pointerEvents = 'none';
+              }
+            };
 
-      // -----------------------------
-      // REAL GAME TIME WAIT
-      // -----------------------------
-      console.log("Waiting 230s of REAL rendered game time...");
-      await frame.evaluate(() => {
-        const REQUIRED_MS = 230000;
-        const start = performance.now();
+            hide();
+            new MutationObserver(hide).observe(document.body, { childList: true, subtree: true });
+          });
 
-        return new Promise(resolve => {
-          function tick() {
-            if (performance.now() - start >= REQUIRED_MS) {
-              resolve(true);
-            } else {
+          // -----------------------------
+          // WAIT UP TO 120s FOR GAME IFRAME
+          // -----------------------------
+          console.log("Waiting up to 120s for game iframe...");
+          const iframeStart = Date.now();
+          let gameIframe = null;
+
+          while (Date.now() - iframeStart < 120000 && !gameIframe) {
+            const widgetHandle = await newPage.$('ark-div.ark-widget-app');
+            if (widgetHandle) {
+              const frames = await widgetHandle.$$('iframe[ark-test-id="ark-game-iframe"]');
+              for (const fh of frames) {
+                const src = await fh.getAttribute("src");
+                if (src && src.includes("knife-smash")) {
+                  gameIframe = fh;
+                  break;
+                }
+              }
+            }
+            if (!gameIframe) await newPage.waitForTimeout(1000);
+          }
+
+          if (!gameIframe) throw new Error("Game iframe not found within 120s");
+
+          console.log("Game iframe found.");
+
+          const frame = await gameIframe.contentFrame();
+          if (!frame) throw new Error("Iframe frame not ready");
+
+          // -----------------------------
+          // REAL RENDERED GAME TIME (190s)
+          // -----------------------------
+          console.log("Waiting 190s of REAL rendered game time...");
+          await frame.evaluate(() => {
+            const REQUIRED_MS = 190000;
+            const start = performance.now();
+
+            return new Promise(resolve => {
+              function tick() {
+                if (performance.now() - start >= REQUIRED_MS) {
+                  resolve(true);
+                } else {
+                  requestAnimationFrame(tick);
+                }
+              }
               requestAnimationFrame(tick);
+            });
+          });
+
+          // -----------------------------
+          // CONTINUE ORIGINAL CLICK LOGIC
+          // -----------------------------
+          let box = await gameIframe.boundingBox();
+          if (!box) throw new Error("Iframe box missing");
+
+          const position1 = { x: box.width / 2, y: box.height * 0.75 };
+          const position2 = { x: box.width / 4, y: box.height * 0.20 };
+          const position3 = { x: box.width / 4, y: box.height * 0.5 };
+
+          let clickCount = 0;
+          const maxClicks = 30;
+
+          for (let i = 0; i < 2; i++) {
+            await frame.locator("body").click({ position: position1, force: true });
+            clickCount++;
+            await newPage.waitForTimeout(300);
+          }
+
+          while (clickCount < maxClicks) {
+            for (const pos of [position2, position3]) {
+              await frame.locator("body").click({ position: pos, force: true });
+              clickCount++;
             }
           }
-          requestAnimationFrame(tick);
-        });
-      });
 
-      console.log("Required game time completed.");
+          loopCounter++;
+
+        } catch (err) {
+          console.log("Game error:", err.message);
+          break;
+        }
+      }
 
       await newPage.close();
-      loopCounter++;
 
     } catch (err) {
-      console.log("Gaming error:", err.message);
-      break;
+      console.log("Failed during NeoBux cycle:", err.message);
+      loopCounter++;
     }
   }
 
