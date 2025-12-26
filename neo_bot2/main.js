@@ -152,6 +152,32 @@ async function runJob() {
 
   console.log(`[ACCOUNT ${acc.username}] Starting gaming (NO RETRIES AFTER THIS)`);
 
+  // =========================
+  // BALANCE CHECK (BEFORE GAMING)
+  // =========================
+  try {
+    await page.waitForSelector("#t_saldo span", { timeout: 20000 });
+    const balance = await page.evaluate(() => {
+      const el = document.querySelector("#t_saldo span");
+      return el ? el.textContent.trim() : null;
+    });
+    if (balance) {
+      const balanceFile = path.join(accountsDir, "balance.json");
+      let data = {};
+      if (fs.existsSync(balanceFile)) {
+        try { data = JSON.parse(fs.readFileSync(balanceFile, "utf8")); } catch {}
+      }
+      data[acc.username] = balance;
+      fs.writeFileSync(balanceFile, JSON.stringify(data, null, 2));
+      console.log(`Balance for ${acc.username}: ${balance}`);
+    }
+  } catch (e) {
+    console.log(`Could not retrieve balance for ${acc.username} - may still be loading`);
+  }
+
+  // =========================
+  // GAMING (POINT OF NO RETURN)
+  // =========================
   try {
     await gaming(page);
     console.log(`[ACCOUNT ${acc.username}] Gaming completed successfully`);
@@ -184,8 +210,8 @@ async function runJob() {
 
     if (!remaining.length) {
       console.log("[EXIT] No accounts left to try.");
-      resetRunningAccounts();   // THIS IS THE FIX
-      continue;                 // try again
+      resetRunningAccounts();
+      continue;
     }
 
     const result = await runJob();
