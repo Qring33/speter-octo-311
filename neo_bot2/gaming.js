@@ -33,7 +33,7 @@ async function clickWithRetry(page, selector, maxRetries = 3, name = "button", o
 // -----------------------------
 module.exports = async function gaming(page) {
   const context = page.context();
-  const maxLoops = 10;
+  const maxLoops = 1;
   const globalEvery = 5;
   let loopCounter = 1;
   let globalLoop = 1;
@@ -119,8 +119,8 @@ module.exports = async function gaming(page) {
       for (let inner = 1; inner <= 5 && loopCounter <= maxLoops; inner++) {
         console.log(`--- Play Cycle ${loopCounter} ---`);
 
-        console.log("Waiting 80s for game iframe...");
-        await newPage.waitForTimeout(80000);
+        console.log("Waiting 120s for game iframe...");
+        await newPage.waitForTimeout(120000);
 
         try {
           // CLOSE POPUP IF EXISTS
