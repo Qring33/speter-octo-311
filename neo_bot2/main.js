@@ -42,7 +42,6 @@ function getAndConsumeAccount() {
   const index = Math.floor(Math.random() * accounts.length);
   const acc = accounts[index];
 
-  // REMOVE IMMEDIATELY (never reused in same run)
   accounts.splice(index, 1);
   fs.writeFileSync(runningAccountsFile, JSON.stringify(accounts, null, 2));
 
@@ -75,9 +74,6 @@ async function runJob() {
   let browser = null;
   let page = null;
 
-  // =========================
-  // SESSION / LOGIN PHASE
-  // =========================
   try {
     if (fs.existsSync(sessionFile)) {
       console.log(`[ACCOUNT ${acc.username}] Found session file, validating...`);
@@ -154,9 +150,6 @@ async function runJob() {
     return "RETRY";
   }
 
-  // =========================
-  // GAMING (POINT OF NO RETURN)
-  // =========================
   console.log(`[ACCOUNT ${acc.username}] Starting gaming (NO RETRIES AFTER THIS)`);
 
   try {
@@ -180,11 +173,19 @@ async function runJob() {
   }
 
   while (true) {
-    const remaining = JSON.parse(fs.readFileSync(runningAccountsFile, "utf8"));
+    let remaining = [];
+
+    try {
+      remaining = JSON.parse(fs.readFileSync(runningAccountsFile, "utf8"));
+    } catch {
+      resetRunningAccounts();
+      continue;
+    }
 
     if (!remaining.length) {
       console.log("[EXIT] No accounts left to try.");
-      break;
+      resetRunningAccounts();   // THIS IS THE FIX
+      continue;                 // try again
     }
 
     const result = await runJob();
