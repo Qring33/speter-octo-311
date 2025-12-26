@@ -119,8 +119,8 @@ module.exports = async function gaming(page) {
       for (let inner = 1; inner <= 5 && loopCounter <= maxLoops; inner++) {
         console.log(`--- Play Cycle ${loopCounter} ---`);
 
-        console.log("Waiting 120s for game iframe...");
-        await newPage.waitForTimeout(120000);
+        console.log("Waiting 80s for game iframe...");
+        await newPage.waitForTimeout(80000);
 
         try {
           // CLOSE POPUP IF EXISTS
