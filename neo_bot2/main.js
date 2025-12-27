@@ -1,4 +1,4 @@
-const { firefox } = require("playwright-extra");
+const { chromium } = require("playwright-extra");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
@@ -7,6 +7,19 @@ const gaming = require("./gaming.js");
 const accountsDir = path.join(__dirname, "neobux_accounts");
 const sourceAccountsFile = path.join(accountsDir, "neobux_accounts.json");
 const runningAccountsFile = path.join(accountsDir, "running_accounts.json");
+
+const chromiumArgs = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--enable-webgl",
+  "--ignore-gpu-blocklist",
+  "--use-gl=swiftshader",
+  "--disable-gpu-sandbox",
+  "--disable-software-rasterizer=false",
+  "--enable-features=CanvasOopRasterization",
+  "--enable-zero-copy",
+  "--enable-unsafe-webgpu"
+];
 
 // =========================
 // INIT / RESET RUNNING POOL
@@ -78,8 +91,9 @@ async function runJob() {
     if (fs.existsSync(sessionFile)) {
       console.log(`[ACCOUNT ${acc.username}] Found session file, validating...`);
 
-      browser = await firefox.launchPersistentContext(profilePath, {
-        headless: true,
+      browser = await chromium.launchPersistentContext(profilePath, {
+        headless: false,
+        args: chromiumArgs,
         userAgent: acc.user_agent,
         locale: "en-US",
         timezoneId: "America/New_York",
@@ -120,8 +134,9 @@ async function runJob() {
 
       await new Promise(r => setTimeout(r, 4000));
 
-      browser = await firefox.launchPersistentContext(profilePath, {
+      browser = await chromium.launchPersistentContext(profilePath, {
         headless: false,
+        args: chromiumArgs,
         userAgent: acc.user_agent,
         locale: "en-US",
         timezoneId: "America/New_York",
