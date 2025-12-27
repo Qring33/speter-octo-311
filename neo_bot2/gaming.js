@@ -33,8 +33,8 @@ async function clickWithRetry(page, selector, maxRetries = 3, name = "button", o
 // -----------------------------
 module.exports = async function gaming(page) {
   const context = page.context();
-  const maxLoops = 10;
-  const globalEvery = 5;
+  const maxLoops = 11;
+  const globalEvery = 6;
   let loopCounter = 1;
   let globalLoop = 1;
 
