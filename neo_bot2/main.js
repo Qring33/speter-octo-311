@@ -92,7 +92,7 @@ async function runJob() {
       console.log(`[ACCOUNT ${acc.username}] Found session file, validating...`);
 
       browser = await chromium.launchPersistentContext(profilePath, {
-        headless: false,
+        headless: true,
         args: chromiumArgs,
         userAgent: acc.user_agent,
         locale: "en-US",
@@ -135,7 +135,7 @@ async function runJob() {
       await new Promise(r => setTimeout(r, 4000));
 
       browser = await chromium.launchPersistentContext(profilePath, {
-        headless: false,
+        headless: true,
         args: chromiumArgs,
         userAgent: acc.user_agent,
         locale: "en-US",
