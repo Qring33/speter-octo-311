@@ -21,7 +21,9 @@ const chromiumArgs = [
   "--enable-unsafe-webgpu"
 ];
 
+// =========================
 // INIT / RESET RUNNING POOL
+// =========================
 function resetRunningAccounts() {
   if (!fs.existsSync(sourceAccountsFile)) {
     console.log("[FATAL] Source accounts file missing. Exiting.");
@@ -32,7 +34,9 @@ function resetRunningAccounts() {
   console.log("[INIT] Running accounts reset from source.");
 }
 
+// =========================
 // GET & CONSUME ACCOUNT
+// =========================
 function getAndConsumeAccount() {
   let accounts = [];
 
@@ -66,7 +70,9 @@ function getAndConsumeAccount() {
   return acc;
 }
 
+// =========================
 // SINGLE JOB
+// =========================
 async function runJob() {
   const acc = getAndConsumeAccount();
   console.log(`[ACCOUNT ${acc.username}] Job started`);
@@ -86,7 +92,7 @@ async function runJob() {
       console.log(`[ACCOUNT ${acc.username}] Found session file, validating...`);
 
       browser = await chromium.launchPersistentContext(profilePath, {
-        headless: true,
+        headless: false,
         args: chromiumArgs,
         userAgent: acc.user_agent,
         locale: "en-US",
@@ -129,7 +135,7 @@ async function runJob() {
       await new Promise(r => setTimeout(r, 4000));
 
       browser = await chromium.launchPersistentContext(profilePath, {
-        headless: true,
+        headless: false,
         args: chromiumArgs,
         userAgent: acc.user_agent,
         locale: "en-US",
@@ -154,7 +160,7 @@ async function runJob() {
     }
 
   } catch (err) {
-    console.log(`[ACCOUNT ${acc.username}] Pre-gaming failure → retry allowed`);
+    console.log(`[ACCOUNT ${acc.username}] Pre-gaming failure ? retry allowed`);
     if (browser) await browser.close().catch(() => {});
     return "RETRY";
   }
@@ -206,7 +212,9 @@ try {
   console.log(`Could not retrieve balance for ${acc.username} - may still be loading`);
 }
 
+  // =========================
   // GAMING (POINT OF NO RETURN)
+  // =========================
   try {
     await gaming(page);
     console.log(`[ACCOUNT ${acc.username}] Gaming completed successfully`);
@@ -219,7 +227,9 @@ try {
   process.exit(0);
 }
 
+// =========================
 // MAIN
+// =========================
 (async () => {
   if (!fs.existsSync(runningAccountsFile)) {
     resetRunningAccounts();
