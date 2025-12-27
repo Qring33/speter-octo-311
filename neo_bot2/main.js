@@ -176,13 +176,30 @@ async function runJob() {
       const el = document.querySelector("#t_saldo span");
       return el ? el.textContent.trim() : null;
     });
+
     if (balance) {
       const balanceFile = path.join(accountsDir, "balance.json");
       let data = {};
+
       if (fs.existsSync(balanceFile)) {
-        try { data = JSON.parse(fs.readFileSync(balanceFile, "utf8")); } catch {}
+        try {
+          data = JSON.parse(fs.readFileSync(balanceFile, "utf8"));
+        } catch {}
       }
-      data[acc.username] = balance;
+
+      // Create date-time string: YYYY-MM-DD::HH:MM:SS
+      const now = new Date();
+      const datetime =
+        now.getFullYear() + "-" +
+        String(now.getMonth() + 1).padStart(2, "0") + "-" +
+        String(now.getDate()).padStart(2, "0") + "::" +
+        String(now.getHours()).padStart(2, "0") + ":" +
+        String(now.getMinutes()).padStart(2, "0") + ":" +
+        String(now.getSeconds()).padStart(2, "0");
+
+      // Rough format: "balance, datetime"
+      data[acc.username] = `${balance}, ${datetime}`;
+
       fs.writeFileSync(balanceFile, JSON.stringify(data, null, 2));
       console.log(`Balance for ${acc.username}: ${balance}`);
     }
