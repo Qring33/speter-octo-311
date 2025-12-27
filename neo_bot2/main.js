@@ -1,4 +1,4 @@
-const { chromium } = require("playwright-extra");
+const { firefox } = require("playwright-extra");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
@@ -8,22 +8,7 @@ const accountsDir = path.join(__dirname, "neobux_accounts");
 const sourceAccountsFile = path.join(accountsDir, "neobux_accounts.json");
 const runningAccountsFile = path.join(accountsDir, "running_accounts.json");
 
-const chromiumArgs = [
-  "--no-sandbox",
-  "--disable-setuid-sandbox",
-  "--enable-webgl",
-  "--ignore-gpu-blocklist",
-  "--use-gl=swiftshader",
-  "--disable-gpu-sandbox",
-  "--disable-software-rasterizer=false",
-  "--enable-features=CanvasOopRasterization",
-  "--enable-zero-copy",
-  "--enable-unsafe-webgpu"
-];
-
-// =========================
 // INIT / RESET RUNNING POOL
-// =========================
 function resetRunningAccounts() {
   if (!fs.existsSync(sourceAccountsFile)) {
     console.log("[FATAL] Source accounts file missing. Exiting.");
@@ -34,9 +19,7 @@ function resetRunningAccounts() {
   console.log("[INIT] Running accounts reset from source.");
 }
 
-// =========================
 // GET & CONSUME ACCOUNT
-// =========================
 function getAndConsumeAccount() {
   let accounts = [];
 
@@ -70,9 +53,7 @@ function getAndConsumeAccount() {
   return acc;
 }
 
-// =========================
 // SINGLE JOB
-// =========================
 async function runJob() {
   const acc = getAndConsumeAccount();
   console.log(`[ACCOUNT ${acc.username}] Job started`);
@@ -91,9 +72,8 @@ async function runJob() {
     if (fs.existsSync(sessionFile)) {
       console.log(`[ACCOUNT ${acc.username}] Found session file, validating...`);
 
-      browser = await chromium.launchPersistentContext(profilePath, {
-        headless: false,
-        args: chromiumArgs,
+      browser = await firefox.launchPersistentContext(profilePath, {
+        headless: true,
         userAgent: acc.user_agent,
         locale: "en-US",
         timezoneId: "America/New_York",
@@ -134,9 +114,8 @@ async function runJob() {
 
       await new Promise(r => setTimeout(r, 4000));
 
-      browser = await chromium.launchPersistentContext(profilePath, {
+      browser = await firefox.launchPersistentContext(profilePath, {
         headless: false,
-        args: chromiumArgs,
         userAgent: acc.user_agent,
         locale: "en-US",
         timezoneId: "America/New_York",
@@ -167,7 +146,7 @@ async function runJob() {
 
   console.log(`[ACCOUNT ${acc.username}] Starting gaming (NO RETRIES AFTER THIS)`);
 
-  // BALANCE CHECK
+   // BALANCE CHECK
 try {
   await page.waitForSelector("#t_saldo span", { timeout: 20000 });
 
@@ -212,9 +191,7 @@ try {
   console.log(`Could not retrieve balance for ${acc.username} - may still be loading`);
 }
 
-  // =========================
   // GAMING (POINT OF NO RETURN)
-  // =========================
   try {
     await gaming(page);
     console.log(`[ACCOUNT ${acc.username}] Gaming completed successfully`);
@@ -227,9 +204,7 @@ try {
   process.exit(0);
 }
 
-// =========================
 // MAIN
-// =========================
 (async () => {
   if (!fs.existsSync(runningAccountsFile)) {
     resetRunningAccounts();
