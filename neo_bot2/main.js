@@ -21,9 +21,7 @@ const chromiumArgs = [
   "--enable-unsafe-webgpu"
 ];
 
-// =========================
 // INIT / RESET RUNNING POOL
-// =========================
 function resetRunningAccounts() {
   if (!fs.existsSync(sourceAccountsFile)) {
     console.log("[FATAL] Source accounts file missing. Exiting.");
@@ -34,9 +32,7 @@ function resetRunningAccounts() {
   console.log("[INIT] Running accounts reset from source.");
 }
 
-// =========================
 // GET & CONSUME ACCOUNT
-// =========================
 function getAndConsumeAccount() {
   let accounts = [];
 
@@ -70,9 +66,7 @@ function getAndConsumeAccount() {
   return acc;
 }
 
-// =========================
 // SINGLE JOB
-// =========================
 async function runJob() {
   const acc = getAndConsumeAccount();
   console.log(`[ACCOUNT ${acc.username}] Job started`);
@@ -167,49 +161,52 @@ async function runJob() {
 
   console.log(`[ACCOUNT ${acc.username}] Starting gaming (NO RETRIES AFTER THIS)`);
 
-  // =========================
-  // BALANCE CHECK (BEFORE GAMING)
-  // =========================
-  try {
-    await page.waitForSelector("#t_saldo span", { timeout: 20000 });
-    const balance = await page.evaluate(() => {
-      const el = document.querySelector("#t_saldo span");
-      return el ? el.textContent.trim() : null;
-    });
+  // BALANCE CHECK
+try {
+  await page.waitForSelector("#t_saldo span", { timeout: 20000 });
 
-    if (balance) {
-      const balanceFile = path.join(accountsDir, "balance.json");
-      let data = {};
+  const balance = await page.evaluate(() => {
+    const el = document.querySelector("#t_saldo span");
+    return el ? el.textContent.trim() : null;
+  });
 
-      if (fs.existsSync(balanceFile)) {
-        try {
-          data = JSON.parse(fs.readFileSync(balanceFile, "utf8"));
-        } catch {}
+  if (balance) {
+    const balanceFile = path.join(accountsDir, "balance.json");
+    let data = {};
+
+    // Read existing file if it exists
+    if (fs.existsSync(balanceFile)) {
+      try {
+        const raw = fs.readFileSync(balanceFile, "utf8");
+        data = raw ? JSON.parse(raw) : {};
+      } catch (err) {
+        data = {};
       }
-
-      // Create date-time string: YYYY-MM-DD::HH:MM:SS
-      const now = new Date();
-      const datetime =
-        now.getFullYear() + "-" +
-        String(now.getMonth() + 1).padStart(2, "0") + "-" +
-        String(now.getDate()).padStart(2, "0") + "::" +
-        String(now.getHours()).padStart(2, "0") + ":" +
-        String(now.getMinutes()).padStart(2, "0") + ":" +
-        String(now.getSeconds()).padStart(2, "0");
-
-      // Rough format: "balance, datetime"
-      data[acc.username] = `${balance}, ${datetime}`;
-
-      fs.writeFileSync(balanceFile, JSON.stringify(data, null, 2));
-      console.log(`Balance for ${acc.username}: ${balance}`);
     }
-  } catch (e) {
-    console.log(`Could not retrieve balance for ${acc.username} - may still be loading`);
-  }
 
-  // =========================
+    // Create date-time string: YYYY-MM-DD::HH:MM:SS
+    const now = new Date();
+    const datetime =
+      now.getFullYear() + "-" +
+      String(now.getMonth() + 1).padStart(2, "0") + "-" +
+      String(now.getDate()).padStart(2, "0") + "::" +
+      String(now.getHours()).padStart(2, "0") + ":" +
+      String(now.getMinutes()).padStart(2, "0") + ":" +
+      String(now.getSeconds()).padStart(2, "0");
+
+    // Update existing username OR add new one
+    data[acc.username] = `${balance}, ${datetime}`;
+
+    // Write back without removing other users
+    fs.writeFileSync(balanceFile, JSON.stringify(data, null, 2));
+
+    console.log(`Balance for ${acc.username}: ${balance}`);
+  }
+} catch (e) {
+  console.log(`Could not retrieve balance for ${acc.username} - may still be loading`);
+}
+
   // GAMING (POINT OF NO RETURN)
-  // =========================
   try {
     await gaming(page);
     console.log(`[ACCOUNT ${acc.username}] Gaming completed successfully`);
@@ -222,9 +219,7 @@ async function runJob() {
   process.exit(0);
 }
 
-// =========================
 // MAIN
-// =========================
 (async () => {
   if (!fs.existsSync(runningAccountsFile)) {
     resetRunningAccounts();
