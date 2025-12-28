@@ -191,6 +191,14 @@ try {
   console.log(`Could not retrieve balance for ${acc.username} - may still be loading`);
 }
 
+// RUN upload.js AGAIN AFTER BALANCE CHECK
+try {
+  console.log(`[ACCOUNT ${acc.username}] Running upload.js (post-balance)`);
+  execSync(`node upload.js ${acc.username}`, { stdio: "inherit" });
+} catch (err) {
+  console.log(`[ACCOUNT ${acc.username}] upload.js failed post-balance (ignored): ${err.message}`);
+}
+
   // GAMING (POINT OF NO RETURN)
   try {
     await gaming(page);
