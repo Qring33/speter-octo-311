@@ -51,11 +51,13 @@ module.exports = async function gaming(page) {
       timeout: 30000
     });
 
+    let newPage = null;
+
     try {
       const rewardButton = "#rwtd";
       await page.waitForSelector(rewardButton, { timeout: 10000 });
 
-      const [newPage] = await Promise.all([
+      [newPage] = await Promise.all([
         context.waitForEvent("page"),
         page.click(rewardButton)
       ]);
@@ -77,7 +79,7 @@ module.exports = async function gaming(page) {
       const maxGameEntryAttempts = 5;
       let gameEntryAttempt = 0;
 
-      while (!gameEntrySuccess && gameEntryAttempt < maxGameEntryAttempts && loopCounter <= maxLoops) {
+      while (!gameEntrySuccess && gameEntryAttempt < maxGameEntryAttempts) {
         gameEntryAttempt++;
         console.log(`Game entry attempt (${gameEntryAttempt}/${maxGameEntryAttempts})`);
 
@@ -112,16 +114,15 @@ module.exports = async function gaming(page) {
 
       if (!gameEntrySuccess) {
         await newPage.close();
-        loopCounter++; // consume loop
+        loopCounter++;
         continue;
       }
 
+      // -------- PLAY CYCLES --------
       for (let inner = 1; inner <= 5 && loopCounter <= maxLoops; inner++) {
 
-        const currentLoop = loopCounter;
-        loopCounter++; // ✅ consume loop immediately
-
-        console.log(`--- Play Cycle ${currentLoop} ---`);
+        console.log(`--- Play Cycle ${loopCounter} ---`);
+        loopCounter++; // 🔥 FIX: increment immediately
 
         console.log("Waiting 80s for game iframe...");
         await newPage.waitForTimeout(80000);
@@ -155,7 +156,6 @@ module.exports = async function gaming(page) {
             };
 
             hide();
-
             new MutationObserver(hide).observe(document.body, {
               childList: true,
               subtree: true
@@ -184,7 +184,7 @@ module.exports = async function gaming(page) {
           console.log("Correct game iframe found.");
 
           const frame = await gameIframe.contentFrame();
-          let box = await gameIframe.boundingBox();
+          const box = await gameIframe.boundingBox();
           if (!frame || !box) throw new Error("Iframe not ready");
 
           const position1 = { x: box.width / 2, y: box.height * 0.75 };
@@ -222,31 +222,6 @@ module.exports = async function gaming(page) {
             }
           }
 
-          let playAgainSuccess = false;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            await newPage.waitForTimeout(5000);
-            const endContainer = await newPage.$('ark-div.ark-game-end-container');
-            if (!endContainer) continue;
-
-            const playAgainBtn = await endContainer.$('ark-div[ark-test-id="ark-play-again-button"]');
-            if (playAgainBtn) {
-              await playAgainBtn.click();
-              playAgainSuccess = true;
-              break;
-            }
-          }
-
-          if (!playAgainSuccess) break;
-
-          const adPlayClickedAgain = await clickWithRetry(
-            newPage,
-            'button.ark-ad-button[data-type="play-button"]',
-            3,
-            "ad/play button (post-restart)"
-          );
-
-          if (!adPlayClickedAgain) break;
-
         } catch (err) {
           console.log("Game error during play cycle:", err.message);
           break;
@@ -257,7 +232,8 @@ module.exports = async function gaming(page) {
 
     } catch (err) {
       console.log("Failed during NeoBux cycle:", err.message);
-      loopCounter++; // consume loop
+      if (newPage) await newPage.close();
+      loopCounter++;
     }
   }
 
