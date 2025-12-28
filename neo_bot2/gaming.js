@@ -74,9 +74,12 @@ module.exports = async function gaming(page) {
 
       console.log("Knife Smash game page loaded.");
 
+      // -----------------------------
+      // GAME ENTRY (ONCE PER LOOP)
+      // -----------------------------
       let gameEntrySuccess = false;
 
-      for (let attempt = 1; attempt <= 5 && !gameEntrySuccess; attempt++) {
+      for (let attempt = 1; attempt <= 5; attempt++) {
         console.log(`Game entry attempt (${attempt}/5)`);
 
         const refreshAndRestart = async () => {
@@ -85,23 +88,26 @@ module.exports = async function gaming(page) {
           await newPage.waitForTimeout(3000);
         };
 
-        if (!await clickWithRetry(
+        const playNowClicked = await clickWithRetry(
           newPage,
           'ark-div[ark-test-id="ark-play-now"]',
           3,
           "Play Now button",
           refreshAndRestart
-        )) continue;
+        );
+        if (!playNowClicked) continue;
 
-        if (!await clickWithRetry(
+        const adPlayClicked = await clickWithRetry(
           newPage,
           'button.ark-ad-button[data-type="play-button"]',
           3,
           "ad/play button",
           refreshAndRestart
-        )) continue;
+        );
+        if (!adPlayClicked) continue;
 
         gameEntrySuccess = true;
+        break;
       }
 
       if (!gameEntrySuccess) {
@@ -111,15 +117,14 @@ module.exports = async function gaming(page) {
       }
 
       // -----------------------------
-      // SINGLE PLAY CYCLE (NO RETRIES)
+      // SINGLE PLAY CYCLE (FULL LOGIC)
       // -----------------------------
       console.log(`--- Play Cycle ${loopCounter} ---`);
-      loopCounter++; //  ADVANCE IMMEDIATELY — NO RE-RUNS POSSIBLE
-
-      console.log("Waiting 80s for game iframe...");
-      await newPage.waitForTimeout(80000);
 
       try {
+        console.log("Waiting 80s for game iframe...");
+        await newPage.waitForTimeout(80000);
+
         const widgetSelector = 'ark-div.ark-widget-app';
         await newPage.waitForSelector(widgetSelector, { timeout: 60000 });
 
@@ -168,11 +173,39 @@ module.exports = async function gaming(page) {
           }
         }
 
+        // -----------------------------
+        // PLAY AGAIN + AD
+        // -----------------------------
+        let playAgainClicked = false;
+
+        for (let i = 1; i <= 3; i++) {
+          await newPage.waitForTimeout(5000);
+          const endContainer = await newPage.$('ark-div.ark-game-end-container');
+          if (!endContainer) continue;
+
+          const playAgainBtn = await endContainer.$('ark-div[ark-test-id="ark-play-again-button"]');
+          if (playAgainBtn) {
+            await playAgainBtn.click();
+            playAgainClicked = true;
+            break;
+          }
+        }
+
+        if (playAgainClicked) {
+          await clickWithRetry(
+            newPage,
+            'button.ark-ad-button[data-type="play-button"]',
+            3,
+            "ad/play button (post-restart)"
+          );
+        }
+
       } catch (err) {
         console.log("Game error during play cycle:", err.message);
       }
 
       await newPage.close();
+      loopCounter++; //  ONLY HERE — END OF FULL CYCLE
 
     } catch (err) {
       console.log("Failed during NeoBux cycle:", err.message);
