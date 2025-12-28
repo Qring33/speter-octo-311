@@ -40,8 +40,10 @@ module.exports = async function gaming(page) {
 
   while (loopCounter <= maxLoops) {
 
-    const currentLoop = loopCounter; // 🔒 consume loop immediately
+    const currentLoop = loopCounter;
     loopCounter++;
+
+    let playCycleConsumed = false; // 🔒 GUARD
 
     if ((currentLoop - 1) % globalEvery === 0) {
       console.log(`===== GLOBAL LOOP ${globalLoop} =====`);
@@ -77,12 +79,17 @@ module.exports = async function gaming(page) {
       console.log("Knife Smash game page loaded.");
 
       let gameEntrySuccess = false;
-      const maxGameEntryAttempts = 5;
       let gameEntryAttempt = 0;
 
-      while (!gameEntrySuccess && gameEntryAttempt < maxGameEntryAttempts) {
+      while (!gameEntrySuccess && gameEntryAttempt < 5) {
+
+        if (playCycleConsumed) {
+          await newPage.close();
+          continue;
+        }
+
         gameEntryAttempt++;
-        console.log(`Game entry attempt (${gameEntryAttempt}/${maxGameEntryAttempts})`);
+        console.log(`Game entry attempt (${gameEntryAttempt}/5)`);
 
         const refreshAndRestart = async () => {
           console.log("Refreshing Knife Smash page and restarting play sequence...");
@@ -113,52 +120,19 @@ module.exports = async function gaming(page) {
         gameEntrySuccess = true;
       }
 
-      if (!gameEntrySuccess) {
+      if (!gameEntrySuccess || playCycleConsumed) {
         await newPage.close();
         continue;
       }
 
+      // 🔒 CONSUME PLAY CYCLE ONCE — FOREVER
+      playCycleConsumed = true;
       console.log(`--- Play Cycle ${currentLoop} ---`);
 
       console.log("Waiting 80s for game iframe...");
       await newPage.waitForTimeout(80000);
 
       try {
-        const popup = await newPage.$('xpath=/html/body/ark-popup');
-        if (popup) {
-          const closeBtn = await newPage.$('xpath=/html/body/ark-popup/ark-div[1]/ark-span');
-          if (closeBtn) {
-            await closeBtn.click();
-            console.log("Popup closed.");
-            await newPage.waitForTimeout(1000);
-          }
-        }
-
-        await newPage.evaluate(() => {
-          const outerXPath = '/html/body/div[1]/div/div/main/ark-main-block/ark-article/ark-grid/ark-grid[4]/ark-div/ark-div/ark-div[2]/ark-div[3]/ark-div[6]';
-          const innerXPath = outerXPath + '/ark-div[2]/ark-div[2]';
-
-          const getByXPath = (xp) =>
-            document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
-              .singleNodeValue;
-
-          const hide = () => {
-            const el = getByXPath(innerXPath);
-            if (el) {
-              el.style.display = 'none';
-              el.style.visibility = 'hidden';
-              el.style.pointerEvents = 'none';
-            }
-          };
-
-          hide();
-
-          new MutationObserver(hide).observe(document.body, {
-            childList: true,
-            subtree: true
-          });
-        });
-
         const widgetSelector = 'ark-div.ark-widget-app';
         await newPage.waitForSelector(widgetSelector, { timeout: 60000 });
 
@@ -185,28 +159,12 @@ module.exports = async function gaming(page) {
         if (!frame || !box) throw new Error("Iframe not ready");
 
         const position1 = { x: box.width / 2, y: box.height * 0.75 };
-        const position2 = { x: box.width / 4, y: box.height * 0.20 };
-        const position3 = { x: box.width / 4, y: box.height * 0.5 };
-
-        let clickCount = 0;
 
         await frame.locator("body").click({ position: position1, force: true });
-        clickCount++;
         console.log("Clicked position1 (first click)");
 
         console.log("Waiting 150s before second position1 click...");
         await newPage.waitForTimeout(150000);
-
-        await frame.locator("body").click({ position: position1, force: true });
-        clickCount++;
-        console.log("Clicked position1 (second click)");
-
-        while (clickCount < 30) {
-          for (const pos of [position2, position3]) {
-            await frame.locator("body").click({ position: pos, force: true });
-            clickCount++;
-          }
-        }
 
       } catch (err) {
         console.log("Game error during play cycle:", err.message);
