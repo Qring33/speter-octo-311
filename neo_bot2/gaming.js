@@ -33,19 +33,14 @@ async function clickWithRetry(page, selector, maxRetries = 3, name = "button", o
 // -----------------------------
 module.exports = async function gaming(page) {
   const context = page.context();
-  const maxLoops = 11;
-  const globalEvery = 6;
+  const maxLoops = 10;
+  const globalEvery = 5;
   let loopCounter = 1;
   let globalLoop = 1;
 
   while (loopCounter <= maxLoops) {
 
-    const currentLoop = loopCounter;
-    loopCounter++;
-
-    let playCycleConsumed = false; // 🔒 GUARD
-
-    if ((currentLoop - 1) % globalEvery === 0) {
+    if ((loopCounter - 1) % globalEvery === 0) {
       console.log(`===== GLOBAL LOOP ${globalLoop} =====`);
       globalLoop++;
     }
@@ -79,17 +74,12 @@ module.exports = async function gaming(page) {
       console.log("Knife Smash game page loaded.");
 
       let gameEntrySuccess = false;
+      const maxGameEntryAttempts = 5;
       let gameEntryAttempt = 0;
 
-      while (!gameEntrySuccess && gameEntryAttempt < 5) {
-
-        if (playCycleConsumed) {
-          await newPage.close();
-          continue;
-        }
-
+      while (!gameEntrySuccess && gameEntryAttempt < maxGameEntryAttempts && loopCounter <= maxLoops) {
         gameEntryAttempt++;
-        console.log(`Game entry attempt (${gameEntryAttempt}/5)`);
+        console.log(`Game entry attempt (${gameEntryAttempt}/${maxGameEntryAttempts})`);
 
         const refreshAndRestart = async () => {
           console.log("Refreshing Knife Smash page and restarting play sequence...");
@@ -120,60 +110,154 @@ module.exports = async function gaming(page) {
         gameEntrySuccess = true;
       }
 
-      if (!gameEntrySuccess || playCycleConsumed) {
+      if (!gameEntrySuccess) {
         await newPage.close();
+        loopCounter++; // consume loop
         continue;
       }
 
-      // 🔒 CONSUME PLAY CYCLE ONCE — FOREVER
-      playCycleConsumed = true;
-      console.log(`--- Play Cycle ${currentLoop} ---`);
+      for (let inner = 1; inner <= 5 && loopCounter <= maxLoops; inner++) {
 
-      console.log("Waiting 80s for game iframe...");
-      await newPage.waitForTimeout(80000);
+        const currentLoop = loopCounter;
+        loopCounter++; // ✅ consume loop immediately
 
-      try {
-        const widgetSelector = 'ark-div.ark-widget-app';
-        await newPage.waitForSelector(widgetSelector, { timeout: 60000 });
+        console.log(`--- Play Cycle ${currentLoop} ---`);
 
-        const widgetHandle = await newPage.$(widgetSelector);
-        if (!widgetHandle) throw new Error("ark-widget-app not found.");
+        console.log("Waiting 80s for game iframe...");
+        await newPage.waitForTimeout(80000);
 
-        const iframeHandles = await widgetHandle.$$('iframe[ark-test-id="ark-game-iframe"]');
-        let gameIframe = null;
-
-        for (const frameHandle of iframeHandles) {
-          const src = await frameHandle.getAttribute("src");
-          if (src && src.includes("knife-smash")) {
-            gameIframe = frameHandle;
-            break;
+        try {
+          const popup = await newPage.$('xpath=/html/body/ark-popup');
+          if (popup) {
+            const closeBtn = await newPage.$('xpath=/html/body/ark-popup/ark-div[1]/ark-span');
+            if (closeBtn) {
+              await closeBtn.click();
+              console.log("Popup closed.");
+              await newPage.waitForTimeout(1000);
+            }
           }
+
+          await newPage.evaluate(() => {
+            const outerXPath = '/html/body/div[1]/div/div/main/ark-main-block/ark-article/ark-grid/ark-grid[4]/ark-div/ark-div/ark-div[2]/ark-div[3]/ark-div[6]';
+            const innerXPath = outerXPath + '/ark-div[2]/ark-div[2]';
+
+            const getByXPath = (xp) =>
+              document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+                .singleNodeValue;
+
+            const hide = () => {
+              const el = getByXPath(innerXPath);
+              if (el) {
+                el.style.display = 'none';
+                el.style.visibility = 'hidden';
+                el.style.pointerEvents = 'none';
+              }
+            };
+
+            hide();
+
+            new MutationObserver(hide).observe(document.body, {
+              childList: true,
+              subtree: true
+            });
+          });
+
+          const widgetSelector = 'ark-div.ark-widget-app';
+          await newPage.waitForSelector(widgetSelector, { timeout: 60000 });
+
+          const widgetHandle = await newPage.$(widgetSelector);
+          if (!widgetHandle) throw new Error("ark-widget-app not found.");
+
+          const iframeHandles = await widgetHandle.$$('iframe[ark-test-id="ark-game-iframe"]');
+          let gameIframe = null;
+
+          for (const frameHandle of iframeHandles) {
+            const src = await frameHandle.getAttribute("src");
+            if (src && src.includes("knife-smash")) {
+              gameIframe = frameHandle;
+              break;
+            }
+          }
+
+          if (!gameIframe) throw new Error("Game iframe missing");
+
+          console.log("Correct game iframe found.");
+
+          const frame = await gameIframe.contentFrame();
+          let box = await gameIframe.boundingBox();
+          if (!frame || !box) throw new Error("Iframe not ready");
+
+          const position1 = { x: box.width / 2, y: box.height * 0.75 };
+          const position2 = { x: box.width / 4, y: box.height * 0.20 };
+          const position3 = { x: box.width / 4, y: box.height * 0.5 };
+
+          let clickCount = 0;
+          const maxClicks = 30;
+
+          await frame.locator("body").click({ position: position1, force: true });
+          clickCount++;
+          console.log("Clicked position1 (first click)");
+
+          console.log("Waiting 150s before second position1 click...");
+          await newPage.waitForTimeout(150000);
+
+          const popupAgain = await newPage.$('xpath=/html/body/ark-popup');
+          if (popupAgain) {
+            const closeBtnAgain = await newPage.$('xpath=/html/body/ark-popup/ark-div[1]/ark-span');
+            if (closeBtnAgain) {
+              await closeBtnAgain.click();
+              console.log("Popup closed (second pass).");
+              await newPage.waitForTimeout(1000);
+            }
+          }
+
+          await frame.locator("body").click({ position: position1, force: true });
+          clickCount++;
+          console.log("Clicked position1 (second click)");
+
+          while (clickCount < maxClicks) {
+            for (const pos of [position2, position3]) {
+              await frame.locator("body").click({ position: pos, force: true });
+              clickCount++;
+            }
+          }
+
+          let playAgainSuccess = false;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            await newPage.waitForTimeout(5000);
+            const endContainer = await newPage.$('ark-div.ark-game-end-container');
+            if (!endContainer) continue;
+
+            const playAgainBtn = await endContainer.$('ark-div[ark-test-id="ark-play-again-button"]');
+            if (playAgainBtn) {
+              await playAgainBtn.click();
+              playAgainSuccess = true;
+              break;
+            }
+          }
+
+          if (!playAgainSuccess) break;
+
+          const adPlayClickedAgain = await clickWithRetry(
+            newPage,
+            'button.ark-ad-button[data-type="play-button"]',
+            3,
+            "ad/play button (post-restart)"
+          );
+
+          if (!adPlayClickedAgain) break;
+
+        } catch (err) {
+          console.log("Game error during play cycle:", err.message);
+          break;
         }
-
-        if (!gameIframe) throw new Error("Game iframe missing");
-
-        console.log("Correct game iframe found.");
-
-        const frame = await gameIframe.contentFrame();
-        const box = await gameIframe.boundingBox();
-        if (!frame || !box) throw new Error("Iframe not ready");
-
-        const position1 = { x: box.width / 2, y: box.height * 0.75 };
-
-        await frame.locator("body").click({ position: position1, force: true });
-        console.log("Clicked position1 (first click)");
-
-        console.log("Waiting 150s before second position1 click...");
-        await newPage.waitForTimeout(150000);
-
-      } catch (err) {
-        console.log("Game error during play cycle:", err.message);
       }
 
       await newPage.close();
 
     } catch (err) {
       console.log("Failed during NeoBux cycle:", err.message);
+      loopCounter++; // consume loop
     }
   }
 
