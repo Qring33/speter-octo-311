@@ -112,18 +112,21 @@ module.exports = async function gaming(page) {
 
       if (!gameEntrySuccess) {
         await newPage.close();
-        loopCounter++;
+        loopCounter++; // consume loop
         continue;
       }
 
       for (let inner = 1; inner <= 5 && loopCounter <= maxLoops; inner++) {
-        console.log(`--- Play Cycle ${loopCounter} ---`);
+
+        const currentLoop = loopCounter;
+        loopCounter++; // ✅ consume loop immediately
+
+        console.log(`--- Play Cycle ${currentLoop} ---`);
 
         console.log("Waiting 80s for game iframe...");
         await newPage.waitForTimeout(80000);
 
         try {
-          // CLOSE POPUP IF EXISTS
           const popup = await newPage.$('xpath=/html/body/ark-popup');
           if (popup) {
             const closeBtn = await newPage.$('xpath=/html/body/ark-popup/ark-div[1]/ark-span');
@@ -134,7 +137,6 @@ module.exports = async function gaming(page) {
             }
           }
 
-          // DISABLE BLOCKING HTML LAYER (PERMANENT)
           await newPage.evaluate(() => {
             const outerXPath = '/html/body/div[1]/div/div/main/ark-main-block/ark-article/ark-grid/ark-grid[4]/ark-div/ark-div/ark-div[2]/ark-div[3]/ark-div[6]';
             const innerXPath = outerXPath + '/ark-div[2]/ark-div[2]';
@@ -160,7 +162,6 @@ module.exports = async function gaming(page) {
             });
           });
 
-          // LOOK FOR GAME IFRAME
           const widgetSelector = 'ark-div.ark-widget-app';
           await newPage.waitForSelector(widgetSelector, { timeout: 60000 });
 
@@ -193,18 +194,13 @@ module.exports = async function gaming(page) {
           let clickCount = 0;
           const maxClicks = 30;
 
-          // ---- MODIFIED LOGIC STARTS HERE ----
-
-          // First position1 click
           await frame.locator("body").click({ position: position1, force: true });
           clickCount++;
           console.log("Clicked position1 (first click)");
 
-          // Wait 120s
           console.log("Waiting 150s before second position1 click...");
           await newPage.waitForTimeout(150000);
 
-          // CLOSE POPUP IF EXISTS (AGAIN)
           const popupAgain = await newPage.$('xpath=/html/body/ark-popup');
           if (popupAgain) {
             const closeBtnAgain = await newPage.$('xpath=/html/body/ark-popup/ark-div[1]/ark-span');
@@ -215,12 +211,9 @@ module.exports = async function gaming(page) {
             }
           }
 
-          // Second position1 click
           await frame.locator("body").click({ position: position1, force: true });
           clickCount++;
           console.log("Clicked position1 (second click)");
-
-          // ---- MODIFIED LOGIC ENDS HERE ----
 
           while (clickCount < maxClicks) {
             for (const pos of [position2, position3]) {
@@ -254,8 +247,6 @@ module.exports = async function gaming(page) {
 
           if (!adPlayClickedAgain) break;
 
-          loopCounter++;
-
         } catch (err) {
           console.log("Game error during play cycle:", err.message);
           break;
@@ -266,7 +257,7 @@ module.exports = async function gaming(page) {
 
     } catch (err) {
       console.log("Failed during NeoBux cycle:", err.message);
-      loopCounter++;
+      loopCounter++; // consume loop
     }
   }
 
