@@ -5,80 +5,121 @@ const path = require('path');
 // ========================= CONFIGURATION =========================
 const RUNS_OF_MAIN = 1;                    // How many times to run main.js
 const DELAY_BETWEEN_RUNS = 2000;           // ms
-// TIMEOUT_PER_SCRIPT removed — no timeout anymore
+const GLOBAL_TIMEOUT_MS = 60 * 60 * 1000;  // 1 hour
 // =================================================================
 
 console.log("Starting automation sequence...\n");
 
-// Step 1: Run downloader.js first
+let currentRun = 0;
+let activeProcess = null;
+let timedOut = false;
+
+// ========================= GLOBAL TIMEOUT =========================
+const globalTimer = setTimeout(() => {
+  timedOut = true;
+  console.error("\n⏰ Global timeout reached (1 hour). Stopping execution...");
+
+  if (activeProcess) {
+    console.error("Terminating active process...");
+    activeProcess.kill('SIGTERM');
+  }
+
+  console.log("Exiting gracefully.");
+  process.exit(0);
+}, GLOBAL_TIMEOUT_MS);
+
+// ========================= STEP 1 =========================
 function runDownloader() {
+  if (timedOut) return;
+
   console.log("Running downloader.js...\n");
 
-  const downloader = exec("node downloader.js");
+  activeProcess = exec("node downloader.js");
 
-  downloader.stdout.on("data", (d) => process.stdout.write(d));
-  downloader.stderr.on("data", (d) => process.stderr.write(d));
+  activeProcess.stdout.on("data", (d) => process.stdout.write(d));
+  activeProcess.stderr.on("data", (d) => process.stderr.write(d));
 
-  downloader.on("close", (code) => {
+  activeProcess.on("close", (code) => {
+    activeProcess = null;
+
     console.log(`downloader.js finished with code ${code}\n`);
-    if (code === 0 || code === null) {
+    if ((code === 0 || code === null) && !timedOut) {
       startMainSequence();
     } else {
       console.error("downloader.js failed. Aborting sequence.");
+      clearTimeout(globalTimer);
       process.exit(1);
     }
   });
 
-  downloader.on("error", (err) => {
+  activeProcess.on("error", (err) => {
+    activeProcess = null;
     console.error("Error running downloader.js:", err);
+    clearTimeout(globalTimer);
     process.exit(1);
   });
 }
 
-// Step 2: Normal flow — main.js (N times) → upload.js (once)
-let currentRun = 0;
-
+// ========================= STEP 2 =========================
 function startMainSequence() {
+  if (timedOut) return;
+
   if (currentRun >= RUNS_OF_MAIN) {
     return runUpload();
   }
 
   currentRun++;
-  console.log(`Running main.js [\( {currentRun}/ \){RUNS_OF_MAIN}]...`);
+  console.log(`Running main.js [${currentRun}/${RUNS_OF_MAIN}]...`);
 
-  const main = exec("node main.js");
+  activeProcess = exec("node main.js");
 
-  main.stdout.on("data", (d) => process.stdout.write(d));
-  main.stderr.on("data", (d) => process.stderr.write(d));
+  activeProcess.stdout.on("data", (d) => process.stdout.write(d));
+  activeProcess.stderr.on("data", (d) => process.stderr.write(d));
 
-  main.on("close", (code) => {
+  activeProcess.on("close", (code) => {
+    activeProcess = null;
+
     console.log(`main.js run ${currentRun} finished (code: ${code})\n`);
-    setTimeout(startMainSequence, DELAY_BETWEEN_RUNS);
+    if (!timedOut) {
+      setTimeout(startMainSequence, DELAY_BETWEEN_RUNS);
+    }
   });
 
-  main.on("error", (err) => {
+  activeProcess.on("error", (err) => {
+    activeProcess = null;
     console.error("Error in main.js:", err);
-    setTimeout(startMainSequence, DELAY_BETWEEN_RUNS);
+    if (!timedOut) {
+      setTimeout(startMainSequence, DELAY_BETWEEN_RUNS);
+    }
   });
 }
 
+// ========================= STEP 3 =========================
 function runUpload() {
+  if (timedOut) return;
+
   console.log("All main.js runs completed.");
   console.log("Running upload.js once...\n");
 
-  const upload = exec("node upload.js");
+  activeProcess = exec("node upload.js");
 
-  upload.stdout.on("data", (d) => process.stdout.write(d));
-  upload.stderr.on("data", (d) => process.stderr.write(d));
+  activeProcess.stdout.on("data", (d) => process.stdout.write(d));
+  activeProcess.stderr.on("data", (d) => process.stderr.write(d));
 
-  upload.on("close", (code) => {
+  activeProcess.on("close", (code) => {
+    activeProcess = null;
+
     console.log(`\nupload.js finished with exit code ${code}`);
     console.log("\nFull sequence completed successfully!\n");
+    clearTimeout(globalTimer);
+    process.exit(0);
   });
 
-  upload.on("error", (err) => {
+  activeProcess.on("error", (err) => {
+    activeProcess = null;
     console.error("upload.js failed:", err);
-    console.log("\nSequence finished with errors.\n");
+    clearTimeout(globalTimer);
+    process.exit(1);
   });
 }
 
