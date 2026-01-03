@@ -38,7 +38,10 @@ async function claimAccount() {
       SELECT id, username, email, password, user_agent, session_json
       FROM accounts
       WHERE status = 'free'
-      ORDER BY id
+      ORDER BY
+        balance_updated_at IS NOT NULL,
+        balance_updated_at ASC,
+        id ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED
     `);
