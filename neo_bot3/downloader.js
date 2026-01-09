@@ -1,75 +1,103 @@
-const https = require('https');
-const fs = require('fs');
-const AdmZip = require('adm-zip');
+const https = require("https");
+const fs = require("fs");
+const path = require("path");
+const AdmZip = require("adm-zip");
 
-// Dropbox folder URLs (downloaded as ZIP)
-const sessionFolderZipUrl = "https://www.dropbox.com/scl/fo/6a9gdztfcwt88crixsd6h/AJ_V2Ok4Yv5PC94W9KHnTRk?rlkey=wn5exayw7d77c6w5cm49r96sp&dl=1";
-const neobuxAccountsZipUrl = "https://www.dropbox.com/scl/fo/0nxyz89rwi0xioz0ie0j9/AI0Vyj0u-Z3RxLIPkmsaj3s?rlkey=ap71po1356qyquhzucjiqnfb5&st=6zo8865a&dl=1";
+/* =======================
+   GITHUB CONFIG
+======================= */
 
-// Other JSON file
-const imageSolverUrl = "https://www.dropbox.com/scl/fi/8b2p7oc8fz8sa4rzt9s20/image_solver.json?rlkey=t3sz5hfc5aj17uu58w4ym3c9u&dl=1";
-const imageSolverPath = "image_solver.json";
+// GitHub repo ZIP (main branch)
+const githubRepoZipUrl =
+    "https://codeload.github.com/Qring33/speter-octo-311/zip/refs/heads/main";
 
-// ZIP destinations
-const sessionZipPath = "session.zip";
-const neobuxAccountsZipPath = "neobux_accounts_V2.zip";
+// ZIP destination
+const repoZipPath = "repo.zip";
 
-// Remove old files/folders
-if (fs.existsSync(imageSolverPath)) fs.unlinkSync(imageSolverPath);
-if (fs.existsSync(sessionZipPath)) fs.unlinkSync(sessionZipPath);
-if (fs.existsSync(neobuxAccountsZipPath)) fs.unlinkSync(neobuxAccountsZipPath);
-if (fs.existsSync("./session")) fs.rmSync("./session", { recursive: true, force: true });
-if (fs.existsSync("./neobux_accounts_V2")) fs.rmSync("./neobux_accounts_V2", { recursive: true, force: true });
+// Target folder inside repo
+const TARGET_FOLDER = "neobux_accounts_V2";
+
+/* =======================
+   CLEAN OLD FILES
+======================= */
+
+if (fs.existsSync(repoZipPath)) fs.unlinkSync(repoZipPath);
+if (fs.existsSync(`./${TARGET_FOLDER}`))
+    fs.rmSync(`./${TARGET_FOLDER}`, { recursive: true, force: true });
 
 console.log("Cleaned old files/folders");
 
+/* =======================
+   DOWNLOAD FUNCTION
+======================= */
+
 function download(url, dest, done) {
-    https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-            return download(res.headers.location, dest, done);
+    https.get(
+        url,
+        { headers: { "User-Agent": "Mozilla/5.0" } },
+        (res) => {
+            if (res.statusCode === 301 || res.statusCode === 302) {
+                return download(res.headers.location, dest, done);
+            }
+
+            if (res.statusCode !== 200) {
+                console.error("Download failed:", res.statusCode);
+                process.exit(1);
+            }
+
+            const file = fs.createWriteStream(dest);
+            res.pipe(file);
+
+            file.on("finish", () => file.close(done));
+            file.on("error", (err) => {
+                console.error("File write error:", err);
+                process.exit(1);
+            });
         }
-        if (res.statusCode !== 200) {
-            console.error("Failed with status:", res.statusCode);
-            process.exit(1);
-        }
-
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-
-        file.on("finish", () => file.close(done));
-        file.on("error", err => {
-            console.error("File write error:", err);
-            process.exit(1);
-        });
-
-    }).on("error", (err) => {
+    ).on("error", (err) => {
         console.error("Download error:", err.message);
         process.exit(1);
     });
 }
 
-function unzipAndRemove(zipPath, extractTo) {
-    console.log(`Unzipping ${zipPath} → ${extractTo}`);
+/* =======================
+   EXTRACT TARGET FOLDER
+======================= */
+
+function extractTargetFolder(zipPath, folderName) {
+    console.log(`Extracting ${folderName} from GitHub repo...`);
+
     const zip = new AdmZip(zipPath);
-    zip.extractAllTo(extractTo, true);
+    const entries = zip.getEntries();
+
+    const tempDir = "./__temp_repo__";
+    zip.extractAllTo(tempDir, true);
+
+    // Repo root folder name (randomized by GitHub)
+    const repoRoot = fs.readdirSync(tempDir)[0];
+    const sourcePath = path.join(tempDir, repoRoot, folderName);
+    const destPath = `./${folderName}`;
+
+    if (!fs.existsSync(sourcePath)) {
+        console.error("Target folder not found in repo");
+        process.exit(1);
+    }
+
+    fs.renameSync(sourcePath, destPath);
+
+    // Cleanup
+    fs.rmSync(tempDir, { recursive: true, force: true });
     fs.unlinkSync(zipPath);
-    console.log(`Deleted zip: ${zipPath}`);
+
+    console.log(`${folderName} ready → ./${folderName}`);
 }
 
-// Download image_solver.json
-download(imageSolverUrl, imageSolverPath, () => {
-    console.log("Downloaded image_solver.json → ./");
+/* =======================
+   MAIN
+======================= */
 
-    // Download session folder
-    download(sessionFolderZipUrl, sessionZipPath, () => {
-        unzipAndRemove(sessionZipPath, "./session");
-
-        // Download neobux_accounts_V2 folder
-        download(neobuxAccountsZipUrl, neobuxAccountsZipPath, () => {
-            unzipAndRemove(neobuxAccountsZipPath, "./neobux_accounts_V2");
-
-            console.log("All files and folders ready.");
-            process.exit(0);
-        });
-    });
+download(githubRepoZipUrl, repoZipPath, () => {
+    extractTargetFolder(repoZipPath, TARGET_FOLDER);
+    console.log("All files and folders ready.");
+    process.exit(0);
 });
