@@ -18,12 +18,24 @@ const repoZipPath = "repo.zip";
 const TARGET_FOLDER = "neobux_accounts";
 
 /* =======================
+   DROPBOX CONFIG
+======================= */
+
+// Dropbox file URL (force direct download)
+const dropboxFileUrl =
+    "https://www.dropbox.com/s/8b2p7oc8fz8sa4rzt9s20/image_solver.json?dl=1";
+
+// Destination for the Dropbox file
+const dropboxFileDest = "image_solver.json";
+
+/* =======================
    CLEAN OLD FILES
 ======================= */
 
 if (fs.existsSync(repoZipPath)) fs.unlinkSync(repoZipPath);
 if (fs.existsSync(`./${TARGET_FOLDER}`))
     fs.rmSync(`./${TARGET_FOLDER}`, { recursive: true, force: true });
+if (fs.existsSync(dropboxFileDest)) fs.unlinkSync(dropboxFileDest);
 
 console.log("Cleaned old files/folders");
 
@@ -98,6 +110,12 @@ function extractTargetFolder(zipPath, folderName) {
 
 download(githubRepoZipUrl, repoZipPath, () => {
     extractTargetFolder(repoZipPath, TARGET_FOLDER);
-    console.log("All files and folders ready.");
-    process.exit(0);
+
+    // After GitHub extraction, download Dropbox file
+    console.log("Downloading Dropbox file...");
+    download(dropboxFileUrl, dropboxFileDest, () => {
+        console.log(`Dropbox file ready → ./${dropboxFileDest}`);
+        console.log("All files and folders ready.");
+        process.exit(0);
+    });
 });
