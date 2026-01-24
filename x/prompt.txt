@@ -1,0 +1,41 @@
+Write a social media post that encourages followers to pick between 2–3 fun or thought-provoking options. Make it engaging, playful, or intriguing, include emojis, and prompt people to comment with their choice.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Create a relatable “everyday life” post that makes people nod, laugh, or comment with their own experiences. Use clever phrasing and emojis.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Craft a playful “would you rather” or hypothetical scenario post that sparks conversation. Include emojis for emphasis.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Generate a witty observation about modern life or trends that followers will instantly relate to. Keep it punchy with emojis.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Write a short, surprising fact or “did you know?” style post that makes people think or share. Include emojis to highlight the key point.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Write a captivating social media post that sparks curiosity or laughter, something your followers would stop scrolling for. Use emojis, clever phrasing, or relatable humor.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Create an intriguing or thought-provoking post that encourages people to comment or share their opinions. Make it relatable, witty, or slightly mysterious. Add emojis.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Craft a funny, lighthearted post that would make someone smile or laugh instantly. Include a playful twist or pun, and add emojis.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Generate an inspiring or motivational social media post that grabs attention. Include a punchy phrase or quote, emojis, and make it shareable.
+(Do not reference AI, hashtags, instructions, or include extra c>
+Output only the post text, and cap everything at 300 maximum characters.)
+
+Generate one engaging and interesting post suitable for X (formerly Twitter).
+The post can be funny, thought-provoking, or intriguing, but must be under 280 characters.
+You may include emojis.
+(Do not reference AI, hashtags, instructions, or include extra commentary or metadata.
+Output only the post text, and cap everything at 300 maximum characters.)
