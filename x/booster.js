@@ -2,11 +2,18 @@ const { firefox } = require("playwright");
 const path = require("path");
 const fs = require("fs");
 
-const PROFILE_PATH = path.resolve(__dirname, "x_only_profile");
+const PROFILE_PATH = path.resolve(__dirname, "../x_only_profile");
 const COMMENTS_PATH = path.resolve(__dirname, "comment.txt");
 
+// ===== TARGET URLS (RANDOM SELECTION) =====
+const TARGET_URLS = [
+  "https://x.com/search?q=let%27s%20connect&src=typeahead_click&f=live",
+  "https://x.com/search?q=follow%20&src=typeahead_click&f=live"
+];
+
 const TARGET_URL =
-  "https://x.com/search?q=let%27s%20connect&src=typeahead_click&f=live";
+  TARGET_URLS[Math.floor(Math.random() * TARGET_URLS.length)];
+// ========================================
 
 const LOGIN_URL = "https://x.com/i/flow/login";
 
@@ -37,7 +44,7 @@ function getRandomComment() {
     process.exit(1);
   }
 
-  console.log("Login successful. URL unchanged.\n");
+  console.log(`Login successful. Opened target:\n${TARGET_URL}\n`);
 
   await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(20000);
@@ -66,11 +73,11 @@ function getRandomComment() {
   let processed = 0;
 
   for (let i = 0; i < validCells.length; i++) {
-    if (processed >= 5) break;
+    if (processed >= 1) break;
 
     const cell = validCells[i];
+
     try {
-      // Add space between trending posts for readability
       if (processed > 0) console.log("");
 
       const moreBtn = await cell.waitForSelector(
@@ -78,6 +85,8 @@ function getRandomComment() {
         { timeout: 10000 }
       );
       await moreBtn.click();
+
+      const menuSelector = 'div[role="menu"]';
 
       const followXPath =
         "/html/body/div[1]/div/div/div[1]/div[2]/div/div/div/div[2]/div/div[3]/div/div/div/div[1]/div[2]/div/span";
@@ -88,7 +97,20 @@ function getRandomComment() {
       );
 
       const followText = await followSpan.innerText();
-      if (!followText.includes("Follow")) continue;
+
+      // ===== FIX: CLOSE MENU IF NOT FOLLOW =====
+      if (!followText.includes("Follow")) {
+        const menuOpen = await page.$(menuSelector);
+        if (menuOpen) {
+          await page.keyboard.press("Escape");
+          await page.waitForSelector(menuSelector, {
+            state: "detached",
+            timeout: 5000
+          });
+        }
+        continue;
+      }
+      // =======================================
 
       await followSpan.click();
       console.log("Followed");
@@ -129,8 +151,8 @@ function getRandomComment() {
 
       console.log("Sent");
 
-      // Ensure dialog is closed
       await page.waitForTimeout(3000);
+
       let dialogStillOpen = await page.$(modalSelector);
       if (dialogStillOpen) {
         await page.keyboard.press("Escape");
@@ -144,12 +166,15 @@ function getRandomComment() {
           }
         }
       }
-      await page.waitForSelector(modalSelector, { state: "detached", timeout: 10000 });
+
+      await page.waitForSelector(modalSelector, {
+        state: "detached",
+        timeout: 10000
+      });
 
       processed++;
       console.log("Done");
 
-      // Anti-rate-limit delay before next trending post
       await page.waitForTimeout(20000);
 
     } catch (err) {
