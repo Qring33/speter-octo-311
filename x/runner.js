@@ -8,8 +8,7 @@ const path = require("path");
 const scripts = [
   { command: "node unzip.js", name: "unzip.js" },
   { command: "python3 gem.py", name: "gem.py" },
-  { command: "node main.js", name: "main.js" },
-  { command: "node booster.js", name: "booster.js" },
+  { command: "node main.js", name: "main.js" }
 ];
 
 /* =======================
