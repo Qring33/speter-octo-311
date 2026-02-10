@@ -19,22 +19,38 @@ if (isNaN(accountIndex) || accountIndex < 1) {
     fs.mkdirSync(USER_DATA_DIR, { recursive: true });
   }
 
+  // ---------------------------
+  // Launch Chromium in VM-friendly mode
+  // ---------------------------
   const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
-    headless: false,
+    headless: false, // headful because we use Xvfb
     viewport: null,
-    const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
-  headless: false,  // keep false for Xvfb display
-  viewport: null,
-  args: [
-    `--disable-gpu`,
-    `--no-sandbox`,
-    `--disable-setuid-sandbox`,
-    `--disable-dev-shm-usage`,
-    `--disable-software-rasterizer`,
-    `--disable-extensions-except=${METAMASK_EXTENSION_PATH}`,
-    `--load-extension=${METAMASK_EXTENSION_PATH}`,
-  ],
-});
+    args: [
+      `--disable-extensions-except=${METAMASK_EXTENSION_PATH}`,
+      `--load-extension=${METAMASK_EXTENSION_PATH}`,
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-gpu",
+      "--disable-software-rasterizer",
+      "--disable-dev-shm-usage",
+      "--disable-background-networking",
+      "--disable-background-timer-throttling",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-breakpad",
+      "--disable-client-side-phishing-detection",
+      "--disable-component-extensions-with-background-pages",
+      "--disable-component-update",
+      "--disable-default-apps",
+      "--disable-extensions",
+      "--disable-infobars",
+      "--disable-popup-blocking",
+      "--disable-sync",
+      "--disable-translate",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-features=IsolateOrigins,site-per-process",
+    ],
+  });
 
   try {
     // ======================
