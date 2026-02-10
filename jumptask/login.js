@@ -22,11 +22,19 @@ if (isNaN(accountIndex) || accountIndex < 1) {
   const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
     headless: false,
     viewport: null,
-    args: [
-      `--disable-extensions-except=${METAMASK_EXTENSION_PATH}`,
-      `--load-extension=${METAMASK_EXTENSION_PATH}`,
-    ],
-  });
+    const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
+  headless: false,  // keep false for Xvfb display
+  viewport: null,
+  args: [
+    `--disable-gpu`,
+    `--no-sandbox`,
+    `--disable-setuid-sandbox`,
+    `--disable-dev-shm-usage`,
+    `--disable-software-rasterizer`,
+    `--disable-extensions-except=${METAMASK_EXTENSION_PATH}`,
+    `--load-extension=${METAMASK_EXTENSION_PATH}`,
+  ],
+});
 
   try {
     // ======================
