@@ -14,7 +14,9 @@ const HEARTBEAT_INTERVAL = 20_000;
 (async () => {
   const VM_ID = `vm-${Math.random().toString(36).slice(2, 8)}`;
 
-  // Claim an available account
+  // ================================
+  // CLAIM ACCOUNT
+  // ================================
   const account = await accountManager.claimAccount(VM_ID);
   if (!account) {
     console.log("No free accounts available.");
@@ -24,8 +26,21 @@ const HEARTBEAT_INTERVAL = 20_000;
   console.log(`Claimed account: ${account.account}`);
   const excludedTasks = account.excluded_tasks || [];
 
-  // 🔑 Extract numeric account ID (account_10 → 10)
+  // Extract numeric account ID (account_18  18)
   const accountNumber = String(account.account).match(/\d+/)?.[0];
+
+  // ================================
+  // FORCE LOGIN BEFORE CONTINUING
+  // ================================
+  try {
+    console.log(`Running login.js for account ${accountNumber}...`);
+    execSync(`node login.js ${accountNumber}`, { stdio: "inherit" });
+    console.log(`Login completed for account ${accountNumber}`);
+  } catch (err) {
+    console.error("Login failed:", err.message);
+    await accountManager.releaseAccount(account.id);
+    return;
+  }
 
   const USER_DATA_DIR = path.join(__dirname, "chrome-profile");
 
@@ -53,45 +68,6 @@ const HEARTBEAT_INTERVAL = 20_000;
   }, HEARTBEAT_INTERVAL);
 
   // ================================
-  // CHECK FOR LOGOUT
-  // ================================
-  const earningsXpath =
-    "/html/body/div[1]/div/header/div/div[2]/button/div/div/div/p";
-  let earningsElem = await page.$(`xpath=${earningsXpath}`);
-
-  if (!earningsElem) {
-    const logoutXpath = "/html/body/div[2]/div[3]/div/div[1]/div";
-    const logoutElem = await page.$(`xpath=${logoutXpath}`);
-
-    if (logoutElem) {
-      console.log(
-        `Detected logout. Running login.js for account ${accountNumber}...`
-      );
-
-      await context.close();
-
-      try {
-        execSync(`node login.js ${accountNumber}`, { stdio: "inherit" });
-
-        context = await chromium.launchPersistentContext(USER_DATA_DIR, {
-          headless: false,
-          viewport: null,
-          userAgent: account.user_agent,
-        });
-
-        page = await context.newPage();
-        await page.goto(jumpTaskUrl, { waitUntil: "domcontentloaded" });
-        await page.waitForTimeout(10_000);
-      } catch (err) {
-        console.error("Login failed:", err.message);
-        await accountManager.releaseAccount(account.id);
-        clearInterval(heartbeatInterval);
-        return;
-      }
-    }
-  }
-
-  // ================================
   // REMOVE BLOCKING DIALOG (up to 3 attempts)
   // ================================
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -116,7 +92,9 @@ const HEARTBEAT_INTERVAL = 20_000;
   // ================================
   // Update initial balance
   // ================================
-  earningsElem = await page.$(`xpath=${earningsXpath}`);
+  const earningsXpath =
+    "/html/body/div[1]/div/header/div/div[2]/button/div/div/div/p";
+  let earningsElem = await page.$(`xpath=${earningsXpath}`);
   let balance = 0;
 
   if (earningsElem) {
