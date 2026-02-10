@@ -23,7 +23,7 @@ if (isNaN(accountIndex) || accountIndex < 1) {
   // Launch Chromium in VM-friendly mode
   // ---------------------------
   const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
-    headless: true, // headful because we use Xvfb
+    headless: false, // headful because we use Xvfb
     viewport: null,
     args: [
       `--disable-extensions-except=${METAMASK_EXTENSION_PATH}`,
