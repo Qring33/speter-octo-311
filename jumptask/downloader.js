@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 const AdmZip = require("adm-zip");
-const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 // List of files to download
 const files = [
