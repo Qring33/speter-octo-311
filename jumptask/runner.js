@@ -11,7 +11,7 @@ const path = require("path");
     console.log("downloader.js completed. Now running main.js...");
 
     // Run main.js
-    execSync(`node ${path.join(__dirname, "login.js 2")}`, { stdio: "inherit" });
+    execSync(`node ${path.join(__dirname, "main.js")}`, { stdio: "inherit" });
 
     console.log("main.js completed. All done!");
   } catch (err) {
