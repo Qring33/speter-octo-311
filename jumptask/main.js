@@ -1,9 +1,9 @@
 const { chromium } = require("playwright");
 const path = require("path");
-const { execSync } = require("child_process");
 const { getYoutubeLink } = require("./modules/finder");
 const { processTaskWithLastLink } = require("./modules/worker");
 const accountManager = require("./accountManager");
+const { restoreProfile } = require("./modules/unzipper");
 
 const jumpTaskUrl =
   "https://app.jumptask.io/earn?tags%5B%5D=Watch+%26+Profit#all_tasks";
@@ -14,9 +14,7 @@ const HEARTBEAT_INTERVAL = 20_000;
 (async () => {
   const VM_ID = `vm-${Math.random().toString(36).slice(2, 8)}`;
 
-  // ================================
-  // CLAIM ACCOUNT
-  // ================================
+  // Claim an available account
   const account = await accountManager.claimAccount(VM_ID);
   if (!account) {
     console.log("No free accounts available.");
@@ -26,24 +24,25 @@ const HEARTBEAT_INTERVAL = 20_000;
   console.log(`Claimed account: ${account.account}`);
   const excludedTasks = account.excluded_tasks || [];
 
-  // Extract numeric account ID (account_18  18)
+  // 🔑 Extract numeric account ID (account_10 → 10)
   const accountNumber = String(account.account).match(/\d+/)?.[0];
 
+  const USER_DATA_DIR = path.join(__dirname, "chrome-profile");
+
   // ================================
-  // FORCE LOGIN BEFORE CONTINUING
+  // RESTORE PROFILE
   // ================================
   try {
-    console.log(`Running login.js for account ${accountNumber}...`);
-    execSync(`node login.js ${accountNumber}`, { stdio: "inherit" });
-    console.log(`Login completed for account ${accountNumber}`);
+    await restoreProfile(accountNumber);
   } catch (err) {
-    console.error("Login failed:", err.message);
+    console.error("Failed to restore profile. Releasing account.");
     await accountManager.releaseAccount(account.id);
     return;
   }
 
-  const USER_DATA_DIR = path.join(__dirname, "chrome-profile");
-
+  // ================================
+  // LAUNCH BROWSER
+  // ================================
   let context = await chromium.launchPersistentContext(USER_DATA_DIR, {
     headless: false,
     viewport: null,
@@ -68,9 +67,9 @@ const HEARTBEAT_INTERVAL = 20_000;
   }, HEARTBEAT_INTERVAL);
 
   // ================================
-  // REMOVE BLOCKING DIALOG (up to 3 attempts)
-  // ================================
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // REMOVE BLOCKING DIALOG
+  // ===============================
+  for (let attempt = 1; attempt <= 2; attempt++) {
     const dialog = await page.$(
       "div.MuiBackdrop-root.MuiModal-backdrop.css-14dl35y"
     );

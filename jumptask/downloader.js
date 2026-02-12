@@ -29,16 +29,20 @@ async function downloadFile(file) {
 function unzipFile(zipPath, targetFolder) {
   const zip = new AdmZip(zipPath);
 
-  // Ensure target folder exists
-  if (!fs.existsSync(targetFolder)) fs.mkdirSync(targetFolder, { recursive: true });
+  if (!fs.existsSync(targetFolder)) {
+    fs.mkdirSync(targetFolder, { recursive: true });
+  }
 
   zip.getEntries().forEach((entry) => {
     const parts = entry.entryName.split("/").slice(1); // remove top-level folder
-    if (parts.length === 0) return; // skip root folder entry
+    if (parts.length === 0) return;
+
     const destPath = path.join(targetFolder, ...parts);
 
     if (entry.isDirectory) {
-      if (!fs.existsSync(destPath)) fs.mkdirSync(destPath, { recursive: true });
+      if (!fs.existsSync(destPath)) {
+        fs.mkdirSync(destPath, { recursive: true });
+      }
     } else {
       fs.writeFileSync(destPath, entry.getData());
     }
@@ -49,10 +53,26 @@ function unzipFile(zipPath, targetFolder) {
 
 // Main
 (async () => {
-  for (const file of files) {
-    const zipPath = await downloadFile(file);
-    const targetFolder = path.join(__dirname, file.name);
-    unzipFile(zipPath, targetFolder);
+  try {
+    // 1️⃣ Download and unzip metamask & chrome-profile
+    for (const file of files) {
+      const zipPath = await downloadFile(file);
+      const targetFolder = path.join(__dirname, file.name);
+      unzipFile(zipPath, targetFolder);
+    }
+
+    // 2️⃣ Unzip existing profiles.zip (no download)
+    const profilesZipPath = path.join(__dirname, "profiles.zip");
+
+    if (!fs.existsSync(profilesZipPath)) {
+      console.log("profiles.zip not found, skipping...");
+    } else {
+      const profilesTarget = path.join(__dirname, "profiles");
+      unzipFile(profilesZipPath, profilesTarget);
+    }
+
+    console.log("All files downloaded and unzipped correctly!");
+  } catch (err) {
+    console.error("Error:", err.message);
   }
-  console.log("All files downloaded and unzipped correctly!");
 })();
