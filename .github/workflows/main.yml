@@ -20,7 +20,12 @@ jobs:
             xvfb \
             x11-xserver-utils \
             libgl1 \
-            libglu1-mesa
+            libglu1-mesa \
+            yt-dlp
+
+          # Verify installation
+          which yt-dlp
+          yt-dlp --version
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -31,7 +36,6 @@ jobs:
         run: |
           cd jumptask
 
-          # If no package.json exists, create one
           if [ ! -f package.json ]; then
             npm init -y
           fi
