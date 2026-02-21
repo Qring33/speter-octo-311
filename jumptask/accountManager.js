@@ -2,12 +2,13 @@
 const { Client } = require("pg");  
   
 // Correct DB and table  
-const DB_CONFIG = {  
-  host: "35.225.142.237",  
-  user: "neobot",  
-  password: "Edmond99",  
-  database: "jumpbot",  
-  port: 5432,  
+const DB_CONFIG = {
+  host: "aws-1-eu-west-1.pooler.supabase.com",
+  user: "postgres.gcmoppkkplzztiayvbdk",
+  password: "ST!k7vuRpVBu.pm",
+  database: "postgres",
+  port: 5432,
+  ssl: { rejectUnauthorized: false }
 };  
   
 const TABLE_NAME = "jumptask";  

@@ -1,9 +1,9 @@
 const { chromium } = require("playwright");
 const path = require("path");
+const { execSync } = require("child_process");
 const { getYoutubeLink } = require("./modules/finder");
 const { processTaskWithLastLink } = require("./modules/worker");
 const accountManager = require("./accountManager");
-const { restoreProfile } = require("./modules/unzipper");
 
 const jumpTaskUrl =
   "https://app.jumptask.io/earn?tags%5B%5D=Watch+%26+Profit#all_tasks";
@@ -24,25 +24,11 @@ const HEARTBEAT_INTERVAL = 20_000;
   console.log(`Claimed account: ${account.account}`);
   const excludedTasks = account.excluded_tasks || [];
 
-  // 🔑 Extract numeric account ID (account_10 → 10)
+  //  Extract numeric account ID (account_10  10)
   const accountNumber = String(account.account).match(/\d+/)?.[0];
 
   const USER_DATA_DIR = path.join(__dirname, "chrome-profile");
 
-  // ================================
-  // RESTORE PROFILE
-  // ================================
-  try {
-    await restoreProfile(accountNumber);
-  } catch (err) {
-    console.error("Failed to restore profile. Releasing account.");
-    await accountManager.releaseAccount(account.id);
-    return;
-  }
-
-  // ================================
-  // LAUNCH BROWSER
-  // ================================
   let context = await chromium.launchPersistentContext(USER_DATA_DIR, {
     headless: false,
     viewport: null,
@@ -67,9 +53,48 @@ const HEARTBEAT_INTERVAL = 20_000;
   }, HEARTBEAT_INTERVAL);
 
   // ================================
-  // REMOVE BLOCKING DIALOG
-  // ===============================
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  // CHECK FOR LOGOUT
+  // ================================
+  const earningsXpath =
+    "/html/body/div[1]/div/header/div/div[2]/button/div/div/div/p";
+  let earningsElem = await page.$(`xpath=${earningsXpath}`);
+
+  if (!earningsElem) {
+    const logoutXpath = "/html/body/div[2]/div[3]/div/div[1]/div";
+    const logoutElem = await page.$(`xpath=${logoutXpath}`);
+
+    if (logoutElem) {
+      console.log(
+        `Detected logout. Running login.js for account ${accountNumber}...`
+      );
+
+      await context.close();
+
+      try {
+        execSync(`node login.js ${accountNumber}`, { stdio: "inherit" });
+
+        context = await chromium.launchPersistentContext(USER_DATA_DIR, {
+          headless: false,
+          viewport: null,
+          userAgent: account.user_agent,
+        });
+
+        page = await context.newPage();
+        await page.goto(jumpTaskUrl, { waitUntil: "domcontentloaded" });
+        await page.waitForTimeout(10_000);
+      } catch (err) {
+        console.error("Login failed:", err.message);
+        await accountManager.releaseAccount(account.id);
+        clearInterval(heartbeatInterval);
+        return;
+      }
+    }
+  }
+
+  // ================================
+  // REMOVE BLOCKING DIALOG (up to 3 attempts)
+  // ================================
+  for (let attempt = 1; attempt <= 3; attempt++) {
     const dialog = await page.$(
       "div.MuiBackdrop-root.MuiModal-backdrop.css-14dl35y"
     );
@@ -91,9 +116,7 @@ const HEARTBEAT_INTERVAL = 20_000;
   // ================================
   // Update initial balance
   // ================================
-  const earningsXpath =
-    "/html/body/div[1]/div/header/div/div[2]/button/div/div/div/p";
-  let earningsElem = await page.$(`xpath=${earningsXpath}`);
+  earningsElem = await page.$(`xpath=${earningsXpath}`);
   let balance = 0;
 
   if (earningsElem) {
