@@ -1,0 +1,48 @@
+name: Run Neo Bot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          repository: Qring33/speter-octo-311
+          ref: main
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update -y
+          sudo apt install -y \
+            git curl ca-certificates \
+            xvfb x11-xserver-utils \
+            libgl1-mesa-glx libglu1-mesa
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: jumptask
+        run: |
+          npm install
+          npm install playwright playwright-extra adm-zip pg --force
+          npx playwright install-deps
+          npx playwright install chromium
+
+      - name: Start Xvfb and run runner.js
+        working-directory: jumptask
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1920x1080x24 +extension GLX +extension RANDR +render -noreset -ac &
+          XVFB_PID=$!
+          sleep 5
+
+          node runner.js
+
+          kill $XVFB_PID || true
