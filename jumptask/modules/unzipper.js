@@ -4,7 +4,7 @@ const AdmZip = require("adm-zip");
 
 async function restoreProfile(accountId, userDataDir) {
   try {
-    const PROFILES_DIR = "/home/kali/botnet/jumptask/profiles";
+    const PROFILES_DIR = path.join(__dirname, "..", "profiles");
 
     // Use the SAME userDataDir passed from main.js
     const DEFAULT_DIR = path.join(userDataDir, "Default");
