@@ -1,19 +1,33 @@
-const { execSync } = require("child_process");
+const { spawn } = require("child_process");
 const path = require("path");
+
+// Time limit in milliseconds (2 hours)
+const TIME_LIMIT = 2 * 60 * 60 * 1000;
 
 (async () => {
   try {
-    console.log("Starting downloader.js...");
+    console.log("Starting main.js...");
 
-    // Run downloader.js
-    execSync(`node ${path.join(__dirname, "downloader.js")}`, { stdio: "inherit" });
+    const mainProcess = spawn("node", [path.join(__dirname, "main.js")], {
+      stdio: "inherit",
+    });
 
-    console.log("downloader.js completed. Now running main.js...");
+    // Kill the process after 2 hours
+    const timer = setTimeout(() => {
+      console.log("Time limit reached. Terminating main.js...");
+      mainProcess.kill("SIGTERM"); // or "SIGKILL" for forceful kill
+    }, TIME_LIMIT);
 
-    // Run main.js
-    execSync(`node ${path.join(__dirname, "main.js")}`, { stdio: "inherit" });
+    mainProcess.on("exit", (code, signal) => {
+      clearTimeout(timer);
+      if (signal) {
+        console.log(`main.js was terminated with signal ${signal}`);
+      } else {
+        console.log(`main.js exited with code ${code}`);
+      }
+      console.log("All done!");
+    });
 
-    console.log("main.js completed. All done!");
   } catch (err) {
     console.error("Runner encountered an error:", err.message);
   }
