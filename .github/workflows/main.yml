@@ -8,11 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout current repository
         uses: actions/checkout@v3
-        with:
-          repository: Qring33/speter-octo-311
-          ref: main
 
       - name: Install system dependencies
         run: |
@@ -30,17 +27,16 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install Node dependencies
-        working-directory: jumptask
+      - name: Install global dependencies
         run: |
-          npm install
-          npm install playwright playwright-extra adm-zip pg --force
+          npm install -g playwright playwright-extra adm-zip pg
           npx playwright install-deps
           npx playwright install chromium
 
       - name: Run runner.js with Xvfb
-        working-directory: jumptask
         run: |
+          cd jumptask
+
           export DISPLAY=:99
           Xvfb :99 -screen 0 1920x1080x24 +extension GLX +extension RANDR +render -noreset -ac &
           XVFB_PID=$!
