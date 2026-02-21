@@ -15,8 +15,26 @@ async function connectWallet(context, page) {
   await page.waitForSelector(modalSelector, { timeout: 30000 });
   console.log("Modal detected");
 
-  await page.click(`${modalSelector} button:has-text("Connect with wallet")`);
-  console.log("Connect with wallet clicked");
+  await page.waitForSelector(modalSelector, { timeout: 30000 });
+console.log("Modal detected");
+
+// Remove Google One Tap iframe if present
+try {
+  await page.evaluate(() => {
+    const googleIframe = document.getElementById("credential_picker_iframe");
+    if (googleIframe) {
+      googleIframe.remove();
+    }
+  });
+  console.log("Removed Google One Tap iframe");
+} catch (_) {}
+
+// Now click safely
+await page
+  .locator(`${modalSelector} button:has-text("Connect with wallet")`)
+  .click({ timeout: 30000 });
+
+console.log("Connect with wallet clicked");
 
   await page.waitForTimeout(10000);
 
@@ -35,12 +53,13 @@ async function connectWallet(context, page) {
       .shadowRoot.querySelector("button")
       .click();
   });
+
   console.log("MetaMask wallet clicked (Shadow DOM)");
 
   // ======================
-  // Get MetaMask popup page
+  // Wait for MetaMask popup
   // ======================
-  const mmPage = await context.waitForEvent("page", { timeout: 60000 });
+  let mmPage = await context.waitForEvent("page", { timeout: 60000 });
   await mmPage.waitForLoadState("domcontentloaded");
 
   // ======================
@@ -52,44 +71,59 @@ async function connectWallet(context, page) {
   console.log("Waiting 10s before clicking Connect confirm...");
   await mmPage.waitForTimeout(10000);
 
-  if (mmPage.isClosed()) {
-    console.log("MetaMask page closed early → assume connected");
-    return;
-  }
+  await mmPage
+    .locator(`xpath=${CONNECT_CONFIRM_XPATH}`)
+    .click({ timeout: 20000 });
 
-  const connectBtn = await mmPage.$(`xpath=${CONNECT_CONFIRM_XPATH}`);
-  if (connectBtn) {
-    await connectBtn.click();
-    console.log("Connection confirmed");
-  }
+  console.log("Connection confirmed");
 
   // ======================
-  // SIGNATURE (same page, auto-close safe)
+  // HANDLE SIGNATURE (robust)
   // ======================
   const SIGN_CONFIRM_XPATH =
     '/html/body/div[1]/div/div/div/div/div[3]/div/button[2]';
 
   console.log("Waiting for signature...");
 
-  for (let i = 0; i < 15; i++) {
-    // If MetaMask closes → signature approved
-    if (mmPage.isClosed()) {
-      console.log("MetaMask popup closed → signature approved");
-      return;
-    }
+  let signatureConfirmed = false;
 
-    const signBtn = await mmPage.$(`xpath=${SIGN_CONFIRM_XPATH}`);
-    if (signBtn) {
-      await signBtn.click();
+  for (let i = 0; i < 30; i++) {
+    try {
+      // If popup was closed → wait for new popup
+      if (mmPage.isClosed()) {
+        console.log("Popup closed → waiting for new signature popup...");
+        mmPage = await context.waitForEvent("page", { timeout: 30000 });
+        await mmPage.waitForLoadState("domcontentloaded");
+      }
+
+      // Try clicking signature button
+      await mmPage
+        .locator(`xpath=${SIGN_CONFIRM_XPATH}`)
+        .click({ timeout: 3000 });
+
       console.log("Signature confirmed");
-      return;
-    }
+      signatureConfirmed = true;
+      break;
 
-    await mmPage.waitForTimeout(1000);
+    } catch (err) {
+      // Page might reload internally OR button not ready yet
+      if (mmPage.isClosed()) {
+        continue;
+      }
+
+      try {
+        await mmPage.waitForLoadState("domcontentloaded", { timeout: 2000 });
+      } catch (_) {}
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
   }
 
-  // If we reach here, MetaMask likely auto-signed
-  console.log("No signature button detected → assume auto-approved");
+  if (!signatureConfirmed) {
+    throw new Error("Signature confirmation failed");
+  }
+
+  console.log("Wallet connection flow completed");
 }
 
 module.exports = { connectWallet };
