@@ -2,12 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const AdmZip = require("adm-zip");
 
-// List of files to download
+// List of files to download (Metamask removed)
 const files = [
-  {
-    url: "https://www.dropbox.com/scl/fi/1k8uej7jto9ukxkk1cmmu/metamask.zip?rlkey=0d0lkbpskkdepn5n5b09i0d3q&st=5dmbn4pq&dl=1",
-    name: "metamask",
-  },
   {
     url: "https://www.dropbox.com/scl/fi/se20ffq0tj6coalqj01m8/chrome-profile.zip?rlkey=90iafi6x5a5ikfxb1k239xhb1&st=pqz9cu4z&dl=1",
     name: "chrome-profile",
@@ -54,7 +50,7 @@ function unzipFile(zipPath, targetFolder) {
 // Main
 (async () => {
   try {
-    // 1️⃣ Download and unzip metamask & chrome-profile
+    // 1️⃣ Download and unzip chrome-profile only
     for (const file of files) {
       const zipPath = await downloadFile(file);
       const targetFolder = path.join(__dirname, file.name);
