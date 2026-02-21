@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout current repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Install system dependencies
@@ -27,9 +27,16 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install global dependencies
+      - name: Install dependencies inside jumptask
         run: |
-          npm install -g playwright playwright-extra adm-zip pg
+          cd jumptask
+
+          # If no package.json exists, create one
+          if [ ! -f package.json ]; then
+            npm init -y
+          fi
+
+          npm install playwright playwright-extra adm-zip pg --save
           npx playwright install-deps
           npx playwright install chromium
 
