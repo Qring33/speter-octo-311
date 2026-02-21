@@ -16,18 +16,21 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          sudo apt update -y
-          sudo apt install -y \
-            git curl ca-certificates \
-            xvfb x11-xserver-utils \
-            libgl1-mesa-glx libglu1-mesa
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            curl \
+            ca-certificates \
+            xvfb \
+            x11-xserver-utils \
+            libgl1 \
+            libglu1-mesa
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: "20"
 
-      - name: Install dependencies
+      - name: Install Node dependencies
         working-directory: jumptask
         run: |
           npm install
@@ -35,7 +38,7 @@ jobs:
           npx playwright install-deps
           npx playwright install chromium
 
-      - name: Start Xvfb and run runner.js
+      - name: Run runner.js with Xvfb
         working-directory: jumptask
         run: |
           export DISPLAY=:99
