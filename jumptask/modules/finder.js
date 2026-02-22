@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 /**
- * Search YouTube (recent uploads) and extract LAST URL from each video description
+ * Search YouTube and extract LAST URL from each video description
  * @param {string} query
  * @param {string} taskId
  * @param {number} maxResults
@@ -22,7 +22,7 @@ async function getYoutubeLink(query, taskId, maxResults = 10) {
       throw new Error("YouTube API key file is empty.");
     }
 
-    // 1️⃣ Search recent videos
+    // 1️⃣ Search videos (YouTube default = relevance)
     const searchRes = await axios.get(
       "https://www.googleapis.com/youtube/v3/search",
       {
@@ -30,7 +30,6 @@ async function getYoutubeLink(query, taskId, maxResults = 10) {
           part: "snippet",
           q: query,
           maxResults,
-          order: "date",
           type: "video",
           key: API_KEY,
         },
@@ -75,7 +74,7 @@ async function getYoutubeLink(query, taskId, maxResults = 10) {
         collectedUrls.push(lastUrl);
       }
 
-      // JMPT match check (unchanged logic)
+      // JMPT match check
       if (lastUrl.includes("jmpt.network")) {
         if (lastUrl.includes(taskId)) {
           console.log("Found matching jmpt.network URL:", lastUrl);

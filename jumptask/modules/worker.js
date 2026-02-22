@@ -1,5 +1,7 @@
 const { getYoutubeLink } = require("./finder");
 const accountManager = require("../accountManager");
+const fs = require("fs");
+const path = require("path");
 
 /**
  * Process task that contains "last link" in instructions
@@ -56,12 +58,41 @@ async function processTaskWithLastLink(
   console.log("Start Task button clicked");
 
   // =============================
-  // FIND URL AFTER START TASK
+  // CHECK jmpt.json FILE
   // =============================
-  const { urls, videosChecked, matched } = await getYoutubeLink(
-    quoted[0],
-    taskId
-  );
+  const JMPT_JSON_PATH = path.join(__dirname, "../jmpt.json");
+  let jmptUrls = [];
+  let foundInJson = false;
+
+  if (fs.existsSync(JMPT_JSON_PATH)) {
+    try {
+      const jmptData = JSON.parse(fs.readFileSync(JMPT_JSON_PATH, "utf-8"));
+      const matchedEntries = jmptData.filter(
+        (entry) => String(entry.id) === String(taskId) && entry.query === quoted[0]
+      );
+
+      if (matchedEntries.length) {
+        foundInJson = true;
+        jmptUrls = matchedEntries.map((entry) => entry.url);
+        console.log("Found task in jmpt.json, using URLs:", jmptUrls);
+      }
+    } catch (err) {
+      console.error("Error reading jmpt.json:", err.message);
+    }
+  }
+
+  // =============================
+  // If not in JSON, fallback to YouTube scanning
+  // =============================
+  let videosChecked = 0;
+  let matched = false;
+
+  if (!foundInJson) {
+    const result = await getYoutubeLink(quoted[0], taskId);
+    jmptUrls = result.urls;
+    videosChecked = result.videosChecked;
+    matched = result.matched;
+  }
 
   // =============================
   // Dynamic wait based on scan depth
@@ -80,7 +111,7 @@ async function processTaskWithLastLink(
   // =============================
   // OPEN URLS AND CLOSE AFTER 15s
   // =============================
-  for (const url of urls) {
+  for (const url of jmptUrls) {
     console.log("Final JMPT URL:", url);
     const jmptPage = await context.newPage();
     await jmptPage.goto(url).catch(() => {});
@@ -99,14 +130,11 @@ async function processTaskWithLastLink(
 
   // =============================
   // SAVE EXCLUSION TO DATABASE
+  // Only if task came from jmpt.json
   // =============================
-  if (!matched) {
-    await accountManager.addExcludedTask(
-      accountId,
-      taskId,
-      quoted[0]
-    );
-    console.log("Task excluded due to no matching jmpt.network URL");
+  if (foundInJson) {
+    await accountManager.addExcludedTask(accountId, taskId, quoted[0]);
+    console.log("Task excluded because it was completed via jmpt.json");
   }
 
   // =============================
