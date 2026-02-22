@@ -12,79 +12,83 @@ jobs:
         uses: actions/checkout@v3
 
       # ---------------------------
-      # Install system dependencies once
+      # Create Dockerfile
       # ---------------------------
-      - name: Install system dependencies
+      - name: Create Dockerfile
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y \
-            curl \
-            ca-certificates \
-            xvfb \
-            x11-xserver-utils \
-            libgl1 \
-            libglu1-mesa \
-            yt-dlp \
-            git
+          cat << 'EOF' > Dockerfile
+          FROM debian:12
 
-          which yt-dlp
-          yt-dlp --version
+          ENV DEBIAN_FRONTEND=noninteractive
+
+          RUN apt update -y && apt install -y \
+              curl git ca-certificates gnupg \
+              xvfb x11-xserver-utils \
+              libgl1 libglu1-mesa \
+              yt-dlp
+
+          RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+              && apt install -y nodejs \
+              && npm install -g npm@latest
+
+          WORKDIR /app
+          COPY . .
+
+          WORKDIR /app/jumptask
+
+          RUN if [ ! -f package.json ]; then npm init -y; fi
+
+          RUN npm install playwright playwright-extra adm-zip pg axios --save \
+              && npx playwright install-deps \
+              && npx playwright install chromium
+
+          ENTRYPOINT ["/bin/bash", "-c", "\
+            DISPLAY=:99 Xvfb :99 -screen 0 1920x1080x24 +extension GLX +extension RANDR +render -noreset -ac & \
+            sleep 5 && \
+            node runner.js \
+          "]
+          EOF
 
       # ---------------------------
-      # Set up Node.js once
+      # Build image once
       # ---------------------------
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20"
+      - name: Build Docker image
+        run: docker build -t neo-bot-image .
 
       # ---------------------------
-      # Install npm dependencies once
+      # Start 5 isolated containers
       # ---------------------------
-      - name: Install dependencies inside jumptask
+      - name: Start 5 containers (20s delay)
         run: |
-          cd jumptask
+          for i in {1..5}; do
+            echo "Starting container $i"
 
-          if [ ! -f package.json ]; then
-            npm init -y
-          fi
+            docker run -d \
+              --name neo-bot-$i \
+              neo-bot-image
 
-          npm install playwright playwright-extra adm-zip pg axios --save
-          npx playwright install-deps
-          npx playwright install chromium
-
-      # ---------------------------
-      # Run 10 independent bots with prefixed logs
-      # ---------------------------
-      - name: Start 10 independent bots
-        run: |
-          cd jumptask
-
-          for i in {1..10}; do
-            (
-              DISPLAY_NUM=$((99 + i))
-              export DISPLAY=:$DISPLAY_NUM
-
-              echo "[bot-$i] Starting on DISPLAY :$DISPLAY_NUM"
-
-              Xvfb :$DISPLAY_NUM -screen 0 1920x1080x24 +extension GLX +extension RANDR +render -noreset -ac &
-              XVFB_PID=$!
-
-              sleep 5
-
-              # Run runner.js with logs prefixed
-              node runner.js 2>&1 | sed "s/^/[bot-$i] /" || echo "[bot-$i] FAILED"
-
-              kill $XVFB_PID || true
-
-              echo "[bot-$i] Finished"
-            ) &
-
-            # 20s delay before starting next bot
             sleep 20
           done
 
-          # Wait for all background bots to finish
+      # ---------------------------
+      # Stream prefixed logs
+      # ---------------------------
+      - name: Stream logs
+        run: |
+          for i in {1..5}; do
+            docker logs -f neo-bot-$i 2>&1 | sed "s/^/[bot-$i] /" &
+          done
+
           wait
 
-          echo "All 10 bots finished."
+      # ---------------------------
+      # Wait for all containers
+      # ---------------------------
+      - name: Wait for containers
+        run: |
+          for i in {1..5}; do
+            docker wait neo-bot-$i
+            echo "neo-bot-$i finished"
+          done
+
+          echo "All 5 bots finished."
