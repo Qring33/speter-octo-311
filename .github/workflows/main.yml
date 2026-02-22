@@ -27,6 +27,7 @@ jobs:
               libgl1 libglu1-mesa \
               yt-dlp
 
+          # Install Node 20
           RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
               && apt install -y nodejs \
               && npm install -g npm@latest
@@ -42,11 +43,8 @@ jobs:
               && npx playwright install-deps \
               && npx playwright install chromium
 
-          ENTRYPOINT ["/bin/bash", "-c", "\
-            DISPLAY=:99 Xvfb :99 -screen 0 1920x1080x24 +extension GLX +extension RANDR +render -noreset -ac & \
-            sleep 5 && \
-            node runner.js \
-          "]
+          # Proper Xvfb usage (NO background race condition)
+          ENTRYPOINT ["xvfb-run", "--auto-servernum", "--server-args=-screen 0 1920x1080x24", "node", "runner.js"]
           EOF
 
       # ---------------------------
@@ -65,6 +63,7 @@ jobs:
 
             docker run -d \
               --name neo-bot-$i \
+              --shm-size=1g \
               neo-bot-image
 
             sleep 20
