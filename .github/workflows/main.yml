@@ -40,7 +40,7 @@ jobs:
             npm init -y
           fi
 
-          npm install playwright playwright-extra adm-zip pg --save
+          npm install playwright playwright-extra adm-zip pg axios --save
           npx playwright install-deps
           npx playwright install chromium
 
