@@ -27,7 +27,6 @@ jobs:
               libgl1 libglu1-mesa \
               yt-dlp
 
-          # Install Node 20
           RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
               && apt install -y nodejs \
               && npm install -g npm@latest
@@ -43,8 +42,12 @@ jobs:
               && npx playwright install-deps \
               && npx playwright install chromium
 
-          # Proper Xvfb usage (NO background race condition)
-          ENTRYPOINT ["xvfb-run", "--auto-servernum", "--server-args=-screen 0 1920x1080x24", "node", "runner.js"]
+          ENTRYPOINT ["/bin/bash", "-c", "\
+            export DISPLAY=:99 && \
+            Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render & \
+            sleep 8 && \
+            node runner.js \
+          "]
           EOF
 
       # ---------------------------
@@ -70,24 +73,25 @@ jobs:
           done
 
       # ---------------------------
-      # Stream prefixed logs
-      # ---------------------------
-      - name: Stream logs
-        run: |
-          for i in {1..5}; do
-            docker logs -f neo-bot-$i 2>&1 | sed "s/^/[bot-$i] /" &
-          done
-
-          wait
-
-      # ---------------------------
-      # Wait for all containers
+      # Wait for all containers to finish
       # ---------------------------
       - name: Wait for containers
         run: |
           for i in {1..5}; do
             docker wait neo-bot-$i
             echo "neo-bot-$i finished"
+          done
+
+      # ---------------------------
+      # Print logs after completion
+      # ---------------------------
+      - name: Print container logs
+        run: |
+          for i in {1..5}; do
+            echo "======================="
+            echo "Logs for bot-$i"
+            echo "======================="
+            docker logs neo-bot-$i 2>&1 | sed "s/^/[bot-$i] /"
           done
 
           echo "All 5 bots finished."
