@@ -44,7 +44,7 @@ const HEARTBEAT_INTERVAL = 20_000;
   // LAUNCH BROWSER
   // ================================
   let context = await chromium.launchPersistentContext(USER_DATA_DIR, {
-    headless: false,
+    headless: true,
     viewport: null,
     userAgent: account.user_agent,
   });
