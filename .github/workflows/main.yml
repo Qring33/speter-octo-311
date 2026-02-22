@@ -4,13 +4,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-bot:
+  run-bots:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # ---------------------------
+      # Install system dependencies once
+      # ---------------------------
       - name: Install system dependencies
         run: |
           sudo apt-get update -y
@@ -21,17 +24,23 @@ jobs:
             x11-xserver-utils \
             libgl1 \
             libglu1-mesa \
-            yt-dlp
+            yt-dlp \
+            git
 
-          # Verify installation
           which yt-dlp
           yt-dlp --version
 
+      # ---------------------------
+      # Set up Node.js once
+      # ---------------------------
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: "20"
 
+      # ---------------------------
+      # Install npm dependencies once
+      # ---------------------------
       - name: Install dependencies inside jumptask
         run: |
           cd jumptask
@@ -44,15 +53,38 @@ jobs:
           npx playwright install-deps
           npx playwright install chromium
 
-      - name: Run runner.js with Xvfb
+      # ---------------------------
+      # Run 10 independent bots with prefixed logs
+      # ---------------------------
+      - name: Start 10 independent bots
         run: |
           cd jumptask
 
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1920x1080x24 +extension GLX +extension RANDR +render -noreset -ac &
-          XVFB_PID=$!
-          sleep 5
+          for i in {1..10}; do
+            (
+              DISPLAY_NUM=$((99 + i))
+              export DISPLAY=:$DISPLAY_NUM
 
-          node runner.js
+              echo "[bot-$i] Starting on DISPLAY :$DISPLAY_NUM"
 
-          kill $XVFB_PID || true
+              Xvfb :$DISPLAY_NUM -screen 0 1920x1080x24 +extension GLX +extension RANDR +render -noreset -ac &
+              XVFB_PID=$!
+
+              sleep 5
+
+              # Run runner.js with logs prefixed
+              node runner.js 2>&1 | sed "s/^/[bot-$i] /" || echo "[bot-$i] FAILED"
+
+              kill $XVFB_PID || true
+
+              echo "[bot-$i] Finished"
+            ) &
+
+            # 20s delay before starting next bot
+            sleep 20
+          done
+
+          # Wait for all background bots to finish
+          wait
+
+          echo "All 10 bots finished."
